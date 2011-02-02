@@ -36,6 +36,11 @@ app.configure('development', function() {
   console.log("Listening to 3000");
 });
 
+app.get('/', function (req, res, next) {
+  res.send('<ul><li><a href="/list">List</a></li>'
+           + '<li><a href="/fetch">Fetch</a></li>'
+           + '<li><a href="/clear">Clear</a></li></ul>');
+});
 
 app.get('/fetch', function (req, res, next) {
   request({
@@ -63,7 +68,26 @@ app.get('/fetch', function (req, res, next) {
 
 app.get('/list', function (req, res, next) {
   rclient.smembers("eventslist", function (err, result) {
-    res.send(result.join("\n"));
+    var htmlStr = "<ul>";
+    for(var i = result.length; i--;) {
+      htmlStr += '<li><a href="/' + result[i] + '">' + result[i] + '</a></li>';
+    }
+    htmlStr += "</ul>";
+    res.send(htmlStr);
+  });
+});
+
+/** Should make this an atomic command but do it later **/
+app.get('/clear', function (req, res, next) {
+  rclient.smembers("eventslist", function (err, results) {
+    if (!err) {
+      rclient.del(results, function (err, results) {
+        if (!err) {
+          rclient.del("eventslist");
+          res.send("Done.");
+        }
+      });
+    }
   });
 });
 
