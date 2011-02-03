@@ -37,6 +37,20 @@ app.configure('development', function() {
 });
 
 app.get('/', function (req, res, next) {
+  rclient.smembers("eventslist", function (err, result) {
+    var multiget = rclient.multi();
+    for (i = 0; i < result.length; i++) {
+      multiget.hgetall(result[i]);
+    }
+    multiget.exec(function (err, replies) {
+      if (!err) {
+        res.send(replies);
+      }
+    });
+  });
+});
+
+app.get('/help', function (req, res, next) {
   res.send('<ul><li><a href="/list">List</a></li>'
            + '<li><a href="/fetch">Fetch</a></li>'
            + '<li><a href="/clear">Clear</a></li></ul>');
