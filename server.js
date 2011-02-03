@@ -167,11 +167,11 @@ app.get('/list', function (req, res, next) {
 /** Should make this an atomic command but do it later **/
 app.get('/clear', function (req, res, next) {
   rclient.smembers("eventslist", function (err, results) {
+    var multi = rclient.multi();
     if (!err) {
-      rclient.del(results, function (err, results) {
+      multi.del(results).del("eventslist").exec(function (err) {
         if (!err) {
-          rclient.del("eventslist");
-          res.send("Done.");
+          res.send(200);
         }
       });
     }
