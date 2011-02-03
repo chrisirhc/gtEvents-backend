@@ -3,13 +3,14 @@ Language: node.js
 Database: redis.io
 
 For Facebook testing:
-1.npm install facebook-js
-2.npm install connect
+1. npm install facebook-js
+2. npm install express
 3. edit file /etc/hosts
 add one line:
-127.0.0.1 kissmood.com
+127.0.0.1 gtevents.localhost
+4. add API keys (DEVELOPMENT keys if you're just testing)
 
 Test Facebook connection:
-1. unauthorize gtEvents application on facebook
-2. open browser, enter kissmood.com:3000/login
+1. unauthorize gtEvents-Developer application on facebook
+2. open browser, enter gtevents.localhost:3000/login
 3. the app will ask for permission and redirect to a page showing your name

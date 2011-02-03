@@ -1,3 +1,11 @@
+// Default value for host
+var THISHOST = "chrisirhc.no.de";
+var DEVELOPMENT_HOST = "gtevents.localhost:3000";
+var FBKEY = 'xxxxxxxxxxxxxxx';
+var FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var DEVELOPMENT_FBKEY = 'xxxxxxxxxxxxxxx';
+var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+
 /**
  * This is where it all begins
  */
@@ -11,21 +19,20 @@ var fbclient = require('./lib/facebook-js');
 
 var app = express.createServer();
 
-/** debugging **/
-app.set('env', 'production');
+/** development / production switch **/
+app.set('env', 'development');
 
 // Setup the server
 app.configure(function () {
   app.use(express.conditionalGet());
   app.use(express.cache());
   app.use(express.gzip());
-  /** if it's a file, serve it **/
-  app.use(express.compiler({src: __dirname + '/public', enable: ['less']}));
-  app.use(express.staticProvider(__dirname + '/public'));
 
   app.use(express.logger());
   app.use(express.bodyDecoder());
   app.use(express.methodOverride());
+  app.use(express.cookieDecoder());
+  app.set('jsonp callback', true);
 });
 
 app.configure('production', function() {
@@ -35,6 +42,9 @@ app.configure('production', function() {
 });
 
 app.configure('development', function() {
+  THISHOST = DEVELOPMENT_HOST;
+  FBKEY = DEVELOPMENT_FBKEY;
+  FBSECRET = DEVELOPMENT_FBSECRET;
   app.listen(3000);
   console.log("Listening to 3000");
 });
