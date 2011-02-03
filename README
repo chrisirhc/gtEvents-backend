@@ -1,3 +1,15 @@
 Backend for the gtEvents mobile web application.
 Language: node.js
 Database: redis.io
+
+For Facebook testing:
+1.npm install facebook-js
+2.npm install connect
+3. edit file /etc/hosts
+add one line:
+127.0.0.1 kissmood.com
+
+Test Facebook connection:
+1. unauthorize gtEvents application on facebook
+2. open browser, enter kissmood.com:3000/login
+3. the app will ask for permission and redirect to a page showing your name
