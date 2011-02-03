@@ -129,6 +129,7 @@ app.get('/help', function (req, res, next) {
            + '<li><a href="/clear">Clear</a></li></ul>');
 });
 
+/** This will be how to fetch the data *manually* for now **/
 app.get('/fetch', function (req, res, next) {
   request({
     uri: "https://graph.facebook.com/search?q=%22georgia+tech%22&type=event&limit=50"
@@ -178,6 +179,9 @@ app.get('/clear', function (req, res, next) {
   });
 });
 
+/**
+ * View details per id.
+ */
 app.get('/:id', function (req, res, next) {
   rclient.hgetall(req.params.id, function (err, result) {
     res.send(result);
