@@ -180,7 +180,7 @@ app.get('/clear', function (req, res, next) {
 
 app.get('/:id', function (req, res, next) {
   rclient.hgetall(req.params.id, function (err, result) {
-    res.send(result, { 'Content-Type': 'text/plain' });
+    res.send(result);
   });
 });
 
