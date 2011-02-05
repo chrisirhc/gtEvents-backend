@@ -6,6 +6,9 @@ var request = require("request");
 var redis = require("redis"),
   rclient = redis.createClient();
 
+  
+var fbclient = require('./lib/facebook-js');
+
 var app = express.createServer();
 
 /** debugging **/
@@ -36,6 +39,67 @@ app.configure('development', function() {
   console.log("Listening to 3000");
 });
 
+/** Setup API keys **/
+fbclient = fbclient(
+  FBKEY,
+  FBSECRET
+);
+
+/**
+ * Facebook Authentication
+ */
+ 
+app.get('/auth', function (req, res) {
+  fbclient.getAccessToken(
+    {redirect_uri: 'http://' + THISHOST + '/auth',
+     code: req.param('code')},
+     function (error, token) {
+        console.log('access token : '+ token.access_token);
+        res.redirect('profile/'+token.access_token);
+    });
+});
+
+/**
+ * Fetch User Facebook Info
+ */
+app.get('/profile/:token', function (req, res, next) {
+  fbclient.apiCall('GET', '/me',
+            {access_token: req.params.token},
+            function (error, result){
+               
+                var id=result.id.toString();
+                rclient.del(id);
+                rclient.hmset(id, result);
+                rclient.hgetall(id, function (err, result) {
+                    res.send('Your data<br/>'+result.name);
+                });
+                
+    });
+});
+
+
+/**
+ * Facbook Login Page
+ * TODO: check access token
+ */
+ 
+app.get('/login', function (req, res, next) {
+  //request permission
+  res.redirect(fbclient.getAuthorizeUrl({
+    client_id: FBKEY,
+    redirect_uri: 'http://' + THISHOST + '/auth',
+    scope:      'offline_access,publish_stream,user_events,friends_events,create_event,rsvp_event'
+  }));
+});
+  
+  
+/**
+ * Events listing
+ * Smart sort not implemented yet
+ * Also no limit set
+ */
+
+>>>>>>> 02d00f5... Add a submodule for changes made in the
 app.get('/', function (req, res, next) {
   rclient.smembers("eventslist", function (err, result) {
     var multiget = rclient.multi();

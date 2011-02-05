@@ -1,0 +1,3 @@
+[submodule "lib/facebook-js"]
+	path = lib/facebook-js
+	url = git://github.com/chrisirhc/facebook-js.git
