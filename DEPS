@@ -1,4 +1,4 @@
 npm install request
 npm install redis
 npm install facebook-js
-npm install connect
+npm install express

@@ -14,7 +14,6 @@ var request = require("request");
 var redis = require("redis"),
   rclient = redis.createClient();
 
-  
 var fbclient = require('./lib/facebook-js');
 
 var app = express.createServer();
