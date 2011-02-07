@@ -55,6 +55,8 @@
           // a complex query for reference : '" and xpath="//table[@id=\'ctl01_ContentPlaceHolder1_MessageList_TopPanel\']/tr/td/p/text() | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 1]/span[@class=\'titlehead\'] | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 2]/div";')
           .results;
 
+        y.log(q);
+
 
         // http://jacketpages.gatech.edu/events/details/53498
         /** Process a requested page **/
