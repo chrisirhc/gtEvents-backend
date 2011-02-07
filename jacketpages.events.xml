@@ -31,8 +31,8 @@
       function getEvents() {
         var q;
         // this is to grab all the threads in the forum from the server
-        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.eventslist' + (startDate ? ("(" + startDate + ")") : ""));
-        return q.results.events;
+        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.eventslist' + (startDate ? (" where startDate='" + startDate + "'") : ""));
+        return q.results.events.event;
       }
 
       /**
