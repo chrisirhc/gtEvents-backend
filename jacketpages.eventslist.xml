@@ -19,7 +19,7 @@
       function getEvents(startDate) {
         var q;
         // this is to grab all the threads in the forum from the server
-        q = y.query('select * from html where url="select * from html where url="http://jacketpages.gatech.edu/events' + (startDate ? "?startDate=" + startDate : "") + '" and xpath="//div[@class=\'result clearfix\']/h5/a"');
+        q = y.query('select * from html where url="http://jacketpages.gatech.edu/events' + (startDate ? ("?startDate=" + startDate) : "") + '" and xpath="//div[@class=\'result clearfix\']/h5/a"');
         this.eventlist = [];
         for each (var eventlink in q.results.a.@['href']) {
           // perform simple regex to extract the threadId
