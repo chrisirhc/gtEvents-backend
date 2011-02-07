@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<table xmlns="http://query.yahooapis.com/v1/schema/table.xsd">
+  <meta>
+    <sampleQuery>select * from {table} where expression = "(.*)" and text = "The quick brown fox leaps over the lazy dog";</sampleQuery>
+    <description>This is a hacked out table. This should output the public events list from JacketPages.</description>
+  </meta>
+  <bindings>
+    <select produces="XML" itemPath="">
+      <urls>
+        <url></url>
+      </urls>
+      <inputs>
+        <key id="eventId" type="xs:string" paramType="variable" />
+        <key id="startDate" type="xs:string" paramType="variable" />
+      </inputs>
+      <execute><![CDATA[
+      default xml namespace = '';
+
+      function getEvents(startDate) {
+        var q;
+        // this is to grab all the threads in the forum from the server
+        q = y.query('select * from html where url="select * from html where url="http://jacketpages.gatech.edu/events' + (startDate ? "?startDate=" + startDate : "") + '" and xpath="//div[@class='result clearfix']/h5/a"');
+        this.eventlist = [];
+        for each (var eventlink in q.results.a.@['href']) {
+          // perform simple regex to extract the threadId
+          this.eventlist.push(eventlink.toString()
+          .replace("/events/details/", ""));
+        }
+        return this.eventlist;
+      }
+
+      var events = getEvents(startDate);
+      response.object = <events></events>;
+      for each (var event in events) {
+        response.object.events += <event id={event} />;
+      }
+	 ]]></execute>
+    </select>
+  </bindings>
+</table>
+
