@@ -26,17 +26,17 @@
 
       // TODO can probably have different forums as an option
       /**
-       * Return a list of threadIds for a particular forum (Photoshop Windows)
+       * Return a list of eventIds
        */
       function getEvents() {
         var q;
         // this is to grab all the threads in the forum from the server
-        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.eventslist(' + (startDate || "") + '); ');
+        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.eventslist' + (startDate ? ("(" + startDate + ")") : ""));
         return q.results.events;
       }
 
       /**
-       * Return a list of posts in the threadId given
+       * Return the event
        */
       function getEvent(eventId) {
         var months = {"January" : "01", "February" : "02", "March" : "03", "April" : "04", "May" : "05", "June" : "06", 
@@ -49,7 +49,7 @@
         var atitle, abody, aauthor, aauthorid, atimestamp, apostid, areplyto;
 
         q =
-          y.query('select * from html where url="http://jacketpages.gatech.edu/organization/womensrecruitmentteam/calendar/details/'
+          y.query('select * from html where url="http://jacketpages.gatech.edu/events/details/'
           + eventId +
           '" and xpath="//div[@id=\'mainColumn\']";')
           // a complex query for reference : '" and xpath="//table[@id=\'ctl01_ContentPlaceHolder1_MessageList_TopPanel\']/tr/td/p/text() | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 1]/span[@class=\'titlehead\'] | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 2]/div";')
@@ -83,7 +83,7 @@
             }
              */
 
-            t = <event timestamp={atimestamp} id={apostid} author={aauthor} authorid={aauthorid} title={atitle} threadid={"S" + threadId} postno={apostno} >{abody}</event>;
+            t = <event timestamp={atimestamp} id={apostid} author={aauthor} authorid={aauthorid} title={atitle} >{abody}</event>;
         return t;
       }
 
@@ -91,9 +91,9 @@
       var event;
       var events;
       if (eventId) {
-        threads = <event id={eventId} />;
+        events = <event id={eventId} />;
       } else {
-        threads = getEvents();
+        events = getEvents();
       }
       response.object = <events/>;
       for each (var eid in events.@['id']) {
