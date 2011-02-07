@@ -28,10 +28,10 @@
       /**
        * Return a list of threadIds for a particular forum (Photoshop Windows)
        */
-      function getThreads() {
+      function getEvents() {
         var q;
         // this is to grab all the threads in the forum from the server
-        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.events('+ startDate +'); ');
+        q = y.query('use "http://chrisirhc.github.com/gtEvents-backend/jacketpages.eventslist.xml"; select * from jacketpages.eventslist('+ startDate +'); ');
         return q.results.events;
       }
 
@@ -45,11 +45,8 @@
         var t = <event id={eventId}/>;
         var q;
 
-        var apost;
-        // postno is actually lineage
-        var atitle, abody, aauthor, aauthorid, atimestamp, apostid, apostno, areplyto;
-
-        apostno = 0;
+        var aevent;
+        var atitle, abody, aauthor, aauthorid, atimestamp, apostid, areplyto;
 
         q =
           y.query('select * from html where url="http://jacketpages.gatech.edu/organization/womensrecruitmentteam/calendar/details/'
@@ -84,25 +81,21 @@
             }
              */
 
-            apost = <post timestamp={atimestamp} id={apostid} author={aauthor} authorid={aauthorid} title={atitle} threadid={"S" + threadId} postno={apostno} >{abody}</post>;
+            t = <event timestamp={atimestamp} id={apostid} author={aauthor} authorid={aauthorid} title={atitle} threadid={"S" + threadId} postno={apostno} >{abody}</event>;
         return t;
       }
 
-      // css=".jive-thread-post-body, .jive-thread-reply-body";
-      // ^(?s)(?:.*?)<div class='jive-rendered-content'>(.*?)</div>.*$
-
-      // Get a list of threads and take out the posts
-      var posts;
-      var thread;
-      var threads;
-      if (threadid) {
-        threads = <thread id={threadid} />;
+      // Get a list of events and get details of each
+      var event;
+      var events;
+      if (eventId) {
+        threads = <event id={eventId} />;
       } else {
-        threads = getThreads();
+        threads = getEvents();
       }
-      response.object = <threads/>;
-      for each (var tid in threads.@['id']) {
-        response.object.threads += getPosts(tid);
+      response.object = <events/>;
+      for each (var eid in events.@['id']) {
+        response.object.events += getEvent(eid);
       }
 	 ]]></execute>
     </select>
