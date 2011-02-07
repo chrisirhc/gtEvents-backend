@@ -99,7 +99,6 @@ app.get('/login', function (req, res, next) {
  * Also no limit set
  */
 
->>>>>>> 02d00f5... Add a submodule for changes made in the
 app.get('/', function (req, res, next) {
   rclient.smembers("eventslist", function (err, result) {
     var multiget = rclient.multi();
