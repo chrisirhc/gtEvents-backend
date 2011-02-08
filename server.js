@@ -103,7 +103,35 @@ app.get('/eventwall/:eid', function (req, res, next) {
 		'/' + req.params.eid + '/feed',
 		{access_token: fbapptoken},
 		function (error, result) {
-			res.send(result);
+			var arr;
+			 for (i = result.data.length; i--;) {
+			 	  hashArr = [];
+          currId = result.data[i].id;
+					var date = result.data[i].updated_time;
+					var year = date.substr(0, 4);
+					var mth = date.substr(5, 2);
+					var day = date.substr(8, 2);
+					var hour = date.substr(11, 2);
+					var min = date.substr(14, 2);
+					var sec = date.substr(17, 2);
+				  result.data[i].update_time = new Date(year, mth, day, hour, min, sec).getTime();
+					result.data[i].name = result.data[i].from.name;
+					result.data[i].message = result.data[i].message + result.data[i].description;
+					result.data[i].picture = 'https://graph.facebook.com/' + result.data[i].from.id + '/picture';
+					delete result.data[i].id;
+					delete result.data[i].from;
+					delete result.data[i].to;
+					delete result.data[i].type;
+					delete result.data[i].created_time;
+					delete result.data[i].updated_time;
+					delete result.data[i].link;
+					delete result.data[i].caption;
+					delete result.data[i].description;
+					delete result.data[i].icon;
+					delete result.data[i].likes; 
+			
+        }
+			res.send(result.data);
 		}
 		);
 });
@@ -136,6 +164,21 @@ app.get('/rsvp_decliened/:eid', function (req, res, next) {
 		}
 		);
 });
+
+/**
+ * Event RSVP List - Maybe
+ */
+app.get('/rsvp_maybe/:eid', function (req, res, next) {
+	fbclient.getEventRSVPList(
+		req.params.eid,
+		fbapptoken,
+		fbclient.RSVP_MAYBE,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
 
 /**
  * Event RSVP List - Maybe
