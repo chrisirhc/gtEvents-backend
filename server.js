@@ -341,7 +341,24 @@ app.get('/fetch', function (req, res, next) {
 });
 
 app.get('/list', function (req, res, next) {
-  rclient.smembers("eventslist", function (err, result) {
+	rclient.smembers("eventslist", function (err, result) {
+	
+		var fql = "SELECT eid, name, pic_small, pic_big, pic, start_time, " +
+							"end_time, host, description FROM event WHERE " +
+							" eid IN (" + result.join(',') + ")";
+		fbclient.fqlCall(
+			{access_token: fbapptoken,
+			 query:fql,
+			 format:'json',
+			},
+			function (err, result) {
+				res.send(result);
+			}
+		);
+	});
+  
+	/*
+	 rclient.smembers("eventslist", function (err, result) {
     var htmlStr = "<ul>";
     for(var i = result.length; i--;) {
       htmlStr += '<li><a href="/' + result[i] + '">' + result[i] + '</a></li>';
@@ -349,6 +366,7 @@ app.get('/list', function (req, res, next) {
     htmlStr += "</ul>";
     res.send(htmlStr);
   });
+  */
 });
 
 /** Should make this an atomic command but do it later **/
