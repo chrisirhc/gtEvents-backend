@@ -17,6 +17,7 @@ var redis = require("redis"),
 var fbclient = require('./lib/facebook-js');
 
 var app = express.createServer();
+var fbapptoken='';
 
 /** development / production switch **/
 app.set('env', 'development');
@@ -54,6 +55,12 @@ fbclient = fbclient(
   FBSECRET
 );
 
+fbclient.getAppToken(function (res) {
+	fbapptoken = res;
+	}
+);
+
+	
 /**
  * Facebook Authentication
  */
@@ -84,6 +91,115 @@ app.get('/profile/:token', function (req, res, next) {
                 });
                 
     });
+});
+
+
+/**
+ * Fetch Event Feed
+ */
+app.get('/eventwall/:eid', function (req, res, next) {
+	fbclient.apiCall(
+		'GET',
+		'/' + req.params.eid + '/feed',
+		{access_token: fbapptoken},
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+
+/**
+ * Event RSVP List - Attend
+ */
+app.get('/rsvp_attend/:eid', function (req, res, next) {
+	fbclient.getEventRSVPList(
+		req.params.eid,
+		fbapptoken,
+		fbclient.RSVP_ATTENDING,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+/**
+ * Event RSVP List - Declined
+ */
+app.get('/rsvp_decliened/:eid', function (req, res, next) {
+	fbclient.getEventRSVPList(
+		req.params.eid,
+		fbapptoken,
+		fbclient.RSVP_DECLINED,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+/**
+ * Event RSVP List - Maybe
+ */
+app.get('/rsvp_maybe/:eid', function (req, res, next) {
+	fbclient.getEventRSVPList(
+		req.params.eid,
+		fbapptoken,
+		fbclient.RSVP_MAYBE,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+/**
+ * Search Event
+ */
+app.get('/event_search/:string', function (req, res, next) {
+	fbclient.searchEvent(
+		req.params.string,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+
+/**
+ * Event Detail
+ */
+app.get('/event_detail/:eid', function (req, res, next) {
+	fbclient.getEventDetail(
+		req.params.eid,
+		function (error, result) {
+			res.send(result);
+		}
+		);
+});
+
+/**
+ * Get Event Created by User
+ */
+app.get('/event_created/:uid', function(req, res, next){
+	rclient.hmget(req.params.uid, 'access_token', function (err, result) {
+		fbclient.getEventsCreated(req.params.uid, 
+			result[0],
+			function(error, events){
+				res.send(events);
+			});
+		});
+});
+
+/**
+ * Get Event Participated by User
+ */
+app.get('/event_participated/:uid', function(req, res, next){
+	rclient.hmget(req.params.uid, 'access_token', function (err, result) {
+		fbclient.getEventsParticipated(req.params.uid, 
+			result[0],
+			function(error, events){
+				res.send(events);
+			});
+		});
 });
 
 
