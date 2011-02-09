@@ -113,7 +113,9 @@ app.get('/eventwall/:eid', function (req, res, next) {
 					var sec = date.substr(17, 2);
 				  result.data[i].update_time = new Date(year, mth, day, hour, min, sec).getTime();
 					result.data[i].name = result.data[i].from.name;
-					result.data[i].message = result.data[i].message + result.data[i].description;
+					result.data[i].message = result.data[i].message;
+					if(result.data[i].description)
+						result.data[i].message = result.data[i].message.concat(" ").concat(result.data[i].description);
 					result.data[i].id = result.data[i].from.id; //user id
 					delete result.data[i].picture;
 					delete result.data[i].from;
