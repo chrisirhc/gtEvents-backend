@@ -128,7 +128,6 @@ app.get('/eventwall/:eid', function (req, res, next) {
 					delete result.data[i].description;
 					delete result.data[i].icon;
 					delete result.data[i].likes; 
-			
         }
 			res.send(result.data);
 		}
@@ -323,9 +322,8 @@ app.get('/fetch', function (req, res, next) {
     uri: "https://graph.facebook.com/search?q=%22georgia+tech%22&type=event&limit=50"
   },
     function (error, response, body) {
-      var bodyObj, i, currId, hashArr;
+      var bodyObj, i, currId;
       if (!error && response.statusCode == 200) {
-        hashArr = [];
         bodyObj = JSON.parse(body);
         /** Care about the order later **/
         for (i = bodyObj.data.length; i--;) {
