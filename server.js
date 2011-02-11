@@ -60,6 +60,7 @@ fbclient = fbclient(
   FBSECRET
 );
 
+/** Get Facebook Application Token (different from user access_token) **/
 fbclient.getAppToken(function (res) {
 	fbapptoken = res;
 });
@@ -74,12 +75,11 @@ app.get('/auth', function (req, res) {
     {redirect_uri: 'http://' + THISHOST + '/auth',
      code: req.param('code')},
      function (error, token) {
-        console.log('access token : '+ token.access_token);
-        res.redirect('profile/'+token.access_token);
 		 	 initUserInfo(token.access_token);
        res.redirect('profile/'+token.access_token);
     });
 });
+
 
 /**
  * Initialize User data
@@ -135,6 +135,9 @@ function initUserInfo(fb_user_token) {
 						multiadd.hmset('event:fb:'+eve.eid, eve);
 						//add to event list
 						multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+						//fetch event feeds
+						getEventFeed(eve.eid);
+
 					}
 								
 					//store to attendance
@@ -204,6 +207,44 @@ app.get('/event/attendance/:eid', function (req, res, next) {
     });		
 	});
 });
+
+function getEventFeed(eid) {
+	fbclient.apiCall(
+		'GET',
+		'/' + eid + '/feed',
+		{access_token: fbapptoken},
+		function (error, result) {
+
+			 for (i = result.data.length; i--;) {
+					var date = result.data[i].updated_time;
+					var year = date.substr(0, 4);
+					var mth = date.substr(5, 2);
+					var day = date.substr(8, 2);
+					var hour = date.substr(11, 2);
+					var min = date.substr(14, 2);
+					var sec = date.substr(17, 2);
+				  result.data[i].update_time = new Date(year, mth, day, hour, min, sec).getTime();
+					result.data[i].name = result.data[i].from.name;
+					result.data[i].message = result.data[i].message + " " + (result.data[i].description || "");
+					result.data[i].actor_id = result.data[i].from.id; //user id
+					delete result.data[i].picture;
+					delete result.data[i].from;
+					delete result.data[i].to;
+					delete result.data[i].type;
+					delete result.data[i].created_time;
+					delete result.data[i].updated_time;
+					delete result.data[i].link;
+					delete result.data[i].caption;
+					delete result.data[i].description;
+					delete result.data[i].icon;
+					delete result.data[i].likes;
+					rclient.sadd('eventfeeds:fb:'+eid, result.data[i].id);
+					rclient.del('feed:fb:'+result.data[i].id);
+					rclient.hmset('feed:fb:'+result.data[i].id, result.data[i]); 	
+        }
+		}
+		);
+}
 
 
 /**
@@ -493,7 +534,10 @@ app.get('/list', function (req, res, next) {
 
 /** Should make this an atomic command but do it later **/
 app.get('/clear', function (req, res, next) {
-  rclient.smembers("eventslist", function (err, results) {
+  //clean up db
+	rclient.flushdb();
+	/*
+	rclient.smembers("eventslist", function (err, results) {
     var multi = rclient.multi();
     if (!err) {
       multi.del(results).del("eventslist").exec(function (err) {
@@ -503,6 +547,7 @@ app.get('/clear', function (req, res, next) {
       });
     }
   });
+  */
 });
 
 /**
