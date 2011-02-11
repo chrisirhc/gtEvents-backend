@@ -117,7 +117,7 @@ function initUserInfo(fb_user_token) {
 					for(i=0; i<result[0].fql_result_set.length; i++) {
 					  eve = result[0].fql_result_set[i];
 						multiadd.hset('usereventslist:'+uid,
-							'event:fb:' + eve.eid + ':', eve.rsvp_status
+							'event:fb:' + eve.eid, eve.rsvp_status
 						);
 					}
 					
@@ -239,6 +239,7 @@ function getEventFeed(eid) {
 					delete result.data[i].description;
 					delete result.data[i].icon;
 					delete result.data[i].likes;
+					delete result.data[i].comments;
 					rclient.sadd('eventfeeds:fb:'+eid, result.data[i].id);
 					rclient.del('feed:fb:'+result.data[i].id);
 					rclient.hmset('feed:fb:'+result.data[i].id, result.data[i]); 	
@@ -352,12 +353,19 @@ app.get('/event/search/:string', function (req, res, next) {
 /**
  * Event Detail
  */
-app.get('/event/detail/:eid', function (req, res, next) {
+app.get('/event/detail/:eid/:uid', function (req, res, next) {
 	var eid = unescape(req.params.eid);
-  rclient.hgetall(eid, function(err, event) {
-		res.send(event);
+	var multiget = rclient.multi();
+	console.log(eid);
+	multiget.hgetall(eid);
+  multiget.hget('usereventslist:'+req.params.uid, 'event:fb:' + eid);
+  multiget.exec(function (err, result) {	
+		result[0].rsvp_status = (result[1] ? result[1] : fbclient.RSVP_NOREPLY);	
+		res.send(result[0]);
 	});
 });
+		
+//eventTotalAttendance('event:fb:179662842054407');
 /**
  * Get Event Attendance (attending)
  * @param {Object} eid [event:fb:179662842054407]
@@ -414,6 +422,7 @@ function getEventList(uid, sort_func, callback) {
 	 rclient.smembers("eventslist", function (err, events) {
      var multiget = rclient.multi();
 		 var eve;
+		 var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
 		 for (var i=0; i<events.length; i++) {
 		 	 eve = events[i];
 		 	 multiget.hgetall(eve);
