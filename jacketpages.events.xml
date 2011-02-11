@@ -53,7 +53,7 @@
 
         atitle = q.div.h2.em.toString();
         apic = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image")..img.@src.toString();
-        apic_large = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image").a.@href.toString();
+        apic_large = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image").a[0].@href.toString();
         // Separate later
         aall_time = q.div.div.div.div.div.div.(@id == "event-info").div[0].p.toString().split(" to ");
         astart_time = aall_time[0];
