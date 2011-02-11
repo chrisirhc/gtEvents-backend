@@ -408,10 +408,9 @@ app.get('/event/participated/:uid', function(req, res, next){
 		});
 });
 
-/**
- * Event List Sorted by Time
- */
-app.get('/event/list/time/:uid', function(req, res, next) {
+
+function getEventList(uid, sort_func, callback) {
+	var results = new Array();
 	 rclient.smembers("eventslist", function (err, events) {
      var multiget = rclient.multi();
 		 var eve;
@@ -419,7 +418,7 @@ app.get('/event/list/time/:uid', function(req, res, next) {
 		 	 eve = events[i];
 		 	 multiget.hgetall(eve);
 			 multiget.smembers("attendance:" + eve.substr(6));
-			 multiget.sinter('fbfriendslist:' + req.params.uid, 
+			 multiget.sinter('fbfriendslist:' + uid, 
 								 			 'attendance:'  + eve.substr(6));
 		 }
 		 multiget.exec(function (err, replies) {
@@ -429,15 +428,50 @@ app.get('/event/list/time/:uid', function(req, res, next) {
 					var friends = replies[i++];
 					event.total_count = attendance.length;
 					event.friend_count = friends.length;
-					// one line description
-					//event.description = event.description.substr();
-					replies[i-2] = attendance.slice(0, NUM_LIST_ATTEND);
-					replies[i-1] = friends.slice(0, NUM_LIST_ATTEND);
-			 }
-			 res.send(replies);
+					event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+					event.friends = friends.slice(0, NUM_LIST_ATTEND);
+					results.push(event);
+					//magic sort!
+				} 
+				results = results.sort(sort_func);
+   			return callback(results);
 		 })
   });	
+}
+
+/**
+ * Event List Sorted by Time
+ */
+app.get('/event/list/time/:uid', function(req, res, next) {
+	getEventList(req.param.uid, 
+				function (a, b) {return b.start_time - a.start_time;},
+				function (result) {
+					res.send(result);
+				});
 });
+
+/**
+ * Event List Sorted by Total Attendance
+ */
+app.get('/event/list/totcount/:uid', function(req, res, next) {
+	getEventList(req.param.uid, 
+			function (a, b) {return b.total_count - a.total_count;},
+			function (result) {
+				res.send(result);
+			});
+});
+
+/**
+ * Event List Sorted by Friend Attendance
+ */
+app.get('/event/list/fricount/:uid', function(req, res, next) {
+	getEventList(req.param.uid, 
+			function (a, b) {return b.friend_count - a.friend_count;},
+			function (result) {
+				res.send(result);
+			});
+});
+
 
 /**
  * Facbook Login Page
