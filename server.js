@@ -113,11 +113,11 @@ function initUserInfo(fb_user_token) {
 					var multiadd = rclient.multi();
   
 					//store user event list
-					rclient.del('fbeventslist:'+uid);
+					rclient.del('usereventslist:'+uid);
 					for(i=0; i<result[0].fql_result_set.length; i++) {
 					  eve = result[0].fql_result_set[i];
-						multiadd.sadd('fbeventslist:'+uid, 
-							'event:fb:' + eve.eid + ':' + eve.rsvp_status
+						multiadd.hset('usereventslist:'+uid,
+							'event:fb:' + eve.eid + ':', eve.rsvp_status
 						);
 					}
 					
