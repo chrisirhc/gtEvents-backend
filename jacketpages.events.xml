@@ -40,7 +40,7 @@
        */
       function getEvent(eventId) {
         var t = <event id={eventId}/>;
-        var q;
+        var q, tempq;
 
         var aevent;
         var aname, apic, apic_large, aall_time, astart_time, aend_time, ahost, adescription, alocation;
@@ -52,14 +52,15 @@
           .results;
 
         atitle = q.div.h2.em.toString();
-        apic = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image")..img.@src.toString();
-        apic_large = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image").a[0].@href.toString();
+        tempq = q.div.div.div.div.div.div;
+        apic = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image")..img.@src.toString();
+        apic_large = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image").a[0].@href.toString();
         // Separate later
-        aall_time = q.div.div.div.div.div.div.(@id == "event-info").div[0].p.toString().split(" to ");
+        aall_time = tempq.(@id == "event-info").div[0].p.toString().split(" to ");
         astart_time = aall_time[0];
         aend_time = aall_time[1];
-        alocation = q.div.div.div.div.div.div.(@id == "event-info").div[1].p.toString();
-        ahost = q.div.div.div.div.div.div.(@id == "event-info").div[2].a.toString();
+        alocation = tempq.(@id == "event-info").div[1].p.toString();
+        ahost = tempq.(@id == "event-info").div[2].a.toString();
         adescription = q.div.div.div.div.p.text().toString();
 
         t = <event id={eventId} title={atitle} pic={apic} pic_large={apic_large} start_time={astart_time} end_time={aend_time} location={alocation} host={ahost} >{adescription}</event>;
