@@ -407,16 +407,6 @@ app.get('/event/participated/:uid', function(req, res, next){
 		});
 });
 
-/**
- * Event List Sorted by Time
- */
-app.get('/event/list/time/:uid', function(req, res, next) {
-	getEventList(req.param.uid, 
-				function (a, b) {return b.start_time - a.start_time;},
-				function (result) {
-					res.send(result);
-				});
-});
 
 function getEventList(uid, sort_func, callback) {
 	var results = new Array();
@@ -447,6 +437,18 @@ function getEventList(uid, sort_func, callback) {
 		 })
   });	
 }
+
+/**
+ * Event List Sorted by Time
+ */
+app.get('/event/list/time/:uid', function(req, res, next) {
+	getEventList(req.param.uid, 
+				function (a, b) {return b.start_time - a.start_time;},
+				function (result) {
+					res.send(result);
+				});
+});
+
 /**
  * Event List Sorted by Total Attendance
  */
