@@ -7,6 +7,10 @@ var DEVELOPMENT_FBKEY = 'xxxxxxxxxxxxxxx';
 var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
 /**
+ * Constants
+ */
+var NUM_LIST_EVENT = 20; //number of events shown on list page
+var NUM_LIST_ATTEND = 5; //number of attendees shown on list page
  * This is where it all begins
  */
 var express = require("express");
@@ -57,8 +61,7 @@ fbclient = fbclient(
 
 fbclient.getAppToken(function (res) {
 	fbapptoken = res;
-	}
-);
+});
 
 	
 /**
@@ -72,35 +75,137 @@ app.get('/auth', function (req, res) {
      function (error, token) {
         console.log('access token : '+ token.access_token);
         res.redirect('profile/'+token.access_token);
+		 	 initUserInfo(token.access_token);
+       res.redirect('profile/'+token.access_token);
     });
 });
+
+/**
+ * Initialize User data
+ * @param {Object} facebook user access_token
+ */
+function initUserInfo(fb_user_token) {
+	fbclient.getMyProfile(
+    fb_user_token,
+  	function (err, res) {
+			//store user info
+			rclient.hmset('user:'+res.id, res);
+			var fqls = new Array();
+			var now = parseInt((new Date().getTime())/1000);
+			var uid = res.id;
+			fqls["userevents"] = "SELECT eid, rsvp_status FROM event_member WHERE uid= " + uid;
+			fqls["userfriends"] = "SELECT uid1 FROM friend WHERE uid2 = " + uid;
+			fqls["upcomingevents"] = 
+				"SELECT eid, name, pic_small, pic_big, pic, start_time, end_time, host, description " +
+				"FROM event WHERE eid IN (SELECT eid FROM #userevents) AND start_time >" + now;
+			fqls['attendance'] = "SELECT eid, uid FROM event_member WHERE eid IN " +
+				"(SELECT eid FROM #upcomingevents) AND rsvp_status = '" + fbclient.RSVP_ATTENDING + "'";
+			fqls['attname'] = "SELECT name, uid FROM user WHERE uid IN " +
+											"(SELECT uid FROM #attendance)";
+			fbclient.multifqlCall(
+				fqls,
+				{access_token: fb_user_token,
+				 format:'json',
+				},
+				function(err, result) {					
+					var i, eve, user;					
+					var multiadd = rclient.multi();
+  
+					//store user event list
+					rclient.del('fbeventslist:'+uid);
+					for(i=0; i<result[0].fql_result_set.length; i++) {
+					  eve = result[0].fql_result_set[i];
+						multiadd.sadd('fbeventslist:'+uid, 
+							'event:fb:' + eve.eid + ':' + eve.rsvp_status
+						);
+					}
+					
+ 					//store friend list
+					for (i=0; i<result[1].fql_result_set.length; i++) {						
+						multiadd.sadd('fbfriendslist:'+uid, result[1].fql_result_set[i].uid1);
+					}
+					
+					//update event time 
+					for (i=0; i<result[2].fql_result_set.length; i++) {
+						eve = result[2].fql_result_set[i];
+						eve.start_time = eve.start_time * 1000; 
+						eve.end_time = eve.end_time * 1000;
+						//store event
+						multiadd.hmset('event:fb:'+eve.eid, eve);
+						//add to event list
+						multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+					}
+								
+					//store to attendance
+					for (i = 0; i < result[3].fql_result_set.length; i++) {
+						eve = result[3].fql_result_set[i];
+						multiadd.sadd('attendance:fb:'+eve.eid, eve.uid);
+					}							
+					
+					//store attendee name
+					for (i=0; i<result[4].fql_result_set.length; i++) {
+						user = result[4].fql_result_set[i];
+						multiadd.hmset('user:'+user.uid, user);
+					}
+
+					multiadd.exec(function (err, replies) {
+						console.log('done fetching');
+					});
+			});
+		});
+}
+
+
 
 /**
  * Fetch User Facebook Info
  */
-app.get('/profile/:token', function (req, res, next) {
-  fbclient.apiCall('GET', '/me',
-            {access_token: req.params.token},
-            function (error, result){
-               
-                var id=result.id.toString();
-                rclient.del(id);
-                rclient.hmset(id, result);
-                rclient.hgetall(id, function (err, result) {
-                    res.send('Your data<br/>'+result.name);
-                });
-                
-    });
+app.get('/profile/:id', function (req, res, next) { 
+  rclient.hgetall('user:'+req.params.id, function (err, result) {
+      res.send(result);
+  });     
 });
 
+/**
+ * Event Feed
+ */
+app.get('/event/feed/:eid', function (req, res, next) {
+	var eid = unescape(req.params.eid).substr(6);
+	rclient.smembers("eventfeeds:" + eid, 
+		function (error, eventfeeds, body) {
+			var multiget = rclient.multi();
+    	for (i = 0; i < eventfeeds.length; i++) {
+     		multiget.hgetall('feed:fb:'+eventfeeds[i]);
+    	}
+    	multiget.exec(function (err, replies) {
+      if (!err) {
+        res.send(replies);
+      }
+    });		
+	});
+});
 
 /**
- * Fetch Event Feed
+ * Event Attendance
  */
-app.get('/eventwall/:eid', function (req, res, next) {
+app.get('/event/attendance/:eid', function (req, res, next) {
+	var eid = unescape(req.params.eid).substr(6);
+	rclient.smembers("attendance:" + eid, 
+		function (error, attendance, body) {
+			var multiget = rclient.multi();
+    	for (i = 0; i < attendance.length; i++) {
+     		multiget.hgetall('user:'+attendance[i]);
+    	}
+    	multiget.exec(function (err, replies) {
+      if (!err) {
+        res.send(replies);
+      }
+    });		
+	});
+});
 	fbclient.apiCall(
 		'GET',
-		'/' + req.params.eid + '/feed',
+		'/' + eid + '/feed',
 		{access_token: fbapptoken},
 		function (error, result) {
 			 for (i = result.data.length; i--;) {
@@ -113,10 +218,8 @@ app.get('/eventwall/:eid', function (req, res, next) {
 					var sec = date.substr(17, 2);
 				  result.data[i].update_time = new Date(year, mth, day, hour, min, sec).getTime();
 					result.data[i].name = result.data[i].from.name;
-					result.data[i].message = result.data[i].message;
-					if(result.data[i].description)
-						result.data[i].message = result.data[i].message.concat(" ").concat(result.data[i].description);
-					result.data[i].id = result.data[i].from.id; //user id
+					result.data[i].message = result.data[i].message + " " + (result.data[i].description || "");
+					result.data[i].actor_id = result.data[i].from.id; //user id
 					delete result.data[i].picture;
 					delete result.data[i].from;
 					delete result.data[i].to;
@@ -127,19 +230,20 @@ app.get('/eventwall/:eid', function (req, res, next) {
 					delete result.data[i].caption;
 					delete result.data[i].description;
 					delete result.data[i].icon;
-					delete result.data[i].likes; 
-			
+					delete result.data[i].likes;
+					rclient.sadd('eventfeeds:fb:'+eid, result.data[i].id);
+					rclient.del('feed:fb:'+result.data[i].id);
+					rclient.hmset('feed:fb:'+result.data[i].id, result.data[i]); 	
         }
-			res.send(result.data);
 		}
 		);
-});
+}
 
 
 /**
  * Event RSVP List - Attend
  */
-app.get('/rsvp_attend/:eid', function (req, res, next) {
+app.get('/event/rsvp/attend/:eid', function (req, res, next) {
 	fbclient.getEventRSVPList(
 		req.params.eid,
 		fbapptoken,
@@ -156,7 +260,7 @@ app.get('/rsvp_attend/:eid', function (req, res, next) {
 /**
  * Event RSVP List - Declined
  */
-app.get('/rsvp_declined/:eid', function (req, res, next) {
+app.get('/event/rsvp/declined/:eid', function (req, res, next) {
 	fbclient.getEventRSVPList(
 		req.params.eid,
 		fbapptoken,
@@ -173,7 +277,7 @@ app.get('/rsvp_declined/:eid', function (req, res, next) {
 /**
  * Event RSVP List - Maybe
  */
-app.get('/rsvp_maybe/:eid', function (req, res, next) {
+app.get('/event/rsvp/maybe/:eid', function (req, res, next) {
 	fbclient.getEventRSVPList(
 		req.params.eid,
 		fbapptoken,
@@ -191,7 +295,7 @@ app.get('/rsvp_maybe/:eid', function (req, res, next) {
 /**
  * Event RSVP List - NoReply
  */
-app.get('/rsvp_noreply/:eid', function (req, res, next) {
+app.get('/event/rsvp/noreply/:eid', function (req, res, next) {
 	fbclient.getEventRSVPList(
 		req.params.eid,
 		fbapptoken,
@@ -208,7 +312,7 @@ app.get('/rsvp_noreply/:eid', function (req, res, next) {
 /**
  * Search Event
  */
-app.get('/event_search/:string', function (req, res, next) {
+app.get('/event/search/:string', function (req, res, next) {
 	var arr = [];
 
 	fbclient.searchEvent(
@@ -229,7 +333,7 @@ app.get('/event_search/:string', function (req, res, next) {
 				function (err, result) {
 					res.send(result);
 				}
-			)
+			);
 
 		}
 	);
@@ -240,19 +344,41 @@ app.get('/event_search/:string', function (req, res, next) {
 /**
  * Event Detail
  */
-app.get('/event_detail/:eid', function (req, res, next) {
-	fbclient.getEventDetail(
-		req.params.eid,
-		function (error, result) {
-			res.send(result);
-		}
-		);
+app.get('/event/detail/:eid', function (req, res, next) {
+	var eid = unescape(req.params.eid);
+  rclient.hgetall(eid, function(err, event) {
+		res.send(event);
+	});
 });
+/**
+ * Get Event Attendance (attending)
+ * @param {Object} eid [event:fb:179662842054407]
+ */
+function eventTotalAttendance(eid) {
+	rclient.scard('attendance:'+eid.substr(6), 
+		function (err, res){
+			return res;
+		});
+}
+
+eventFriendsAttendance('user:1370634668','event:fb:149881618403471');
+/**
+ * Get Event Friends Attendance
+ * @param {Object} uid [user:1370634668]
+ * @param {Object} eid [event:fb:179662842054407]
+ */
+function eventFriendsAttendance(uid, eid) {
+	rclient.sinter('fbfriendslist:' + uid.substr(5), 
+								 'attendance:'  + eid.substr(6),
+		function (err, result) {
+			return result.length;
+		})
+}
 
 /**
  * Get Event Created by User
  */
-app.get('/event_created/:uid', function(req, res, next){
+app.get('/event/created/:uid', function(req, res, next){
 	rclient.hmget(req.params.uid, 'access_token', function (err, result) {
 		fbclient.getEventsCreated(req.params.uid, 
 			result[0],
@@ -265,7 +391,7 @@ app.get('/event_created/:uid', function(req, res, next){
 /**
  * Get Event Participated by User
  */
-app.get('/event_participated/:uid', function(req, res, next){
+app.get('/event/participated/:uid', function(req, res, next){
 	rclient.hmget(req.params.uid, 'access_token', function (err, result) {
 		fbclient.getEventsParticipated(req.params.uid, 
 			result[0],
@@ -275,6 +401,36 @@ app.get('/event_participated/:uid', function(req, res, next){
 		});
 });
 
+/**
+ * Event List Sorted by Time
+ */
+app.get('/event/list/time/:uid', function(req, res, next) {
+	 rclient.smembers("eventslist", function (err, events) {
+     var multiget = rclient.multi();
+		 var eve;
+		 for (var i=0; i<events.length; i++) {
+		 	 eve = events[i];
+		 	 multiget.hgetall(eve);
+			 multiget.smembers("attendance:" + eve.substr(6));
+			 multiget.sinter('fbfriendslist:' + req.params.uid, 
+								 			 'attendance:'  + eve.substr(6));
+		 }
+		 multiget.exec(function (err, replies) {
+		 	 for(var i=0; i<replies.length; ) {
+			 	  var event = replies[i++];
+					var attendance = replies[i++];
+					var friends = replies[i++];
+					event.total_count = attendance.length;
+					event.friend_count = friends.length;
+					// one line description
+					//event.description = event.description.substr();
+					replies[i-2] = attendance.slice(0, NUM_LIST_ATTEND);
+					replies[i-1] = friends.slice(0, NUM_LIST_ATTEND);
+			 }
+			 res.send(replies);
+		 })
+  });	
+});
 
 /**
  * Facbook Login Page
@@ -347,7 +503,7 @@ app.get('/list', function (req, res, next) {
 	
 		var fql = "SELECT eid, name, pic_small, pic_big, pic, start_time, " +
 							"end_time, host, description FROM event WHERE " +
-							" eid IN (" + result.join(',') + ")";
+							" eid IN (" + result.join(',') + ") AND start_time >" + parseInt((new Date().getTime())/1000);
 		fbclient.fqlCall(
 			{access_token: fbapptoken,
 			 query:fql,
