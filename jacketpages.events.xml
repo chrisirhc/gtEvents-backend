@@ -53,7 +53,7 @@
 
         atitle = q.div.h2.em.toString();
         tempq = q.div.div.div.div.div.div;
-        if (tempq.(@id == "event-image")) {
+        if (tempq.(@id == "event-image").length()) {
           apic = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image")..img.@src.toString();
           apic_large = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image").a[0].@href.toString();
         } else {
