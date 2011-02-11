@@ -97,7 +97,7 @@ function initUserInfo(fb_user_token) {
 			fqls["userevents"] = "SELECT eid, rsvp_status FROM event_member WHERE uid= " + uid;
 			fqls["userfriends"] = "SELECT uid1 FROM friend WHERE uid2 = " + uid;
 			fqls["upcomingevents"] = 
-				"SELECT eid, name, pic_small, pic_big, pic, start_time, end_time, host, description " +
+				"SELECT eid, name, pic_small, pic_big, pic, start_time, end_time, host, description, location " +
 				"FROM event WHERE eid IN (SELECT eid FROM #userevents) AND start_time >" + now;
 			fqls['attendance'] = "SELECT eid, uid FROM event_member WHERE eid IN " +
 				"(SELECT eid FROM #upcomingevents) AND rsvp_status = '" + fbclient.RSVP_ATTENDING + "'";
