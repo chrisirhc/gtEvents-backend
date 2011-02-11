@@ -53,8 +53,12 @@
 
         atitle = q.div.h2.em.toString();
         tempq = q.div.div.div.div.div.div;
-        apic = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image")..img.@src.toString();
-        apic_large = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image").a[0].@href.toString();
+        if (tempq.(@id == "event-image")) {
+          apic = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image")..img.@src.toString();
+          apic_large = "http://jacketpages.gatech.edu" + tempq.(@id == "event-image").a[0].@href.toString();
+        } else {
+          apic = apic_large = null;
+        }
         // Separate later
         aall_time = tempq.(@id == "event-info").div[0].p.toString().split(" to ");
         astart_time = aall_time[0];
