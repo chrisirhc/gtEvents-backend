@@ -135,6 +135,7 @@ function initUserInfo(fb_user_token) {
 						multiadd.hmset('event:fb:'+eve.eid, eve);
 						//add to event list
 						multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+						multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
 						//fetch event feeds
 						getEventFeed(eve.eid);
 
@@ -477,6 +478,37 @@ app.get('/help', function (req, res, next) {
   res.send('<ul><li><a href="/list">List</a></li>'
            + '<li><a href="/fetch">Fetch</a></li>'
            + '<li><a href="/clear">Clear</a></li></ul>');
+});
+
+app.get('/fetchjp', function (req, res, next) {
+  request({
+    uri: "http://query.yahooapis.com/v1/public/yql?q=use%20%22http%3A%2F%2Fchrisirhc.github.com%2FgtEvents-backend%2Fjacketpages.events.xml%22%3B%20select%20*%20from%20jacketpages.events%3B&format=json"
+  },
+    function (error, response, body) {
+      var bodyObj, i, currId, eve, multi;
+      if (!error && response.statusCode == 200) {
+        bodyObj = JSON.parse(body);
+        events = bodyObj.query.results.events.event;
+        multi = rclient.multi();
+
+        for (i = 0; eve = events[i]; i++) {
+          eve.eid = eve.id;
+          if (eve.end_time.indexOf(",") == -1) {
+            eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
+          }
+          // Insert into database
+          multi.hmset('event:jp:'+eve.eid, eve);
+          multi.sadd('eventslist', 'event:jp:'+eve.eid);
+          multi.sadd('eventslist:jp', 'event:jp:'+eve.eid);
+        }
+
+        multi.exec(function (err, replies) {
+          if (!err) {
+            res.send("Fetched");
+          }
+        });
+      }
+    });
 });
 
 /** This will be how to fetch the data *manually* for now **/
