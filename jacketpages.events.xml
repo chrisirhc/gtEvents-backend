@@ -39,51 +39,29 @@
        * Return the event
        */
       function getEvent(eventId) {
-        var months = {"January" : "01", "February" : "02", "March" : "03", "April" : "04", "May" : "05", "June" : "06", 
-        "July" : "07", "August" : "08", "September" : "09", "October" : "10", "November" : "11", "December" : "12"};
-
         var t = <event id={eventId}/>;
         var q;
 
         var aevent;
-        var atitle, abody, aauthor, aauthorid, atimestamp, apostid, areplyto;
+        var aname, apic, aall_time, astart_time, aend_time, ahost, adescription, alocation;
 
         q =
           y.query('select * from html where url="http://jacketpages.gatech.edu/events/details/'
           + eventId +
           '" and xpath="//div[@id=\'mainColumn\']";')
-          // a complex query for reference : '" and xpath="//table[@id=\'ctl01_ContentPlaceHolder1_MessageList_TopPanel\']/tr/td/p/text() | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 1]/span[@class=\'titlehead\'] | //table[@class=\'maintable\' and position() >= 2]/tr/td[position() = 2]/div";')
           .results;
 
-        y.log(q);
+        atitle = q.div.h2.em.toString());
+        apic = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image")..img.@src.toString();
+        // Separate later
+        aall_time = q.div.div.div.div.div.div.(@id == "event-info").div[0].p.toString().split(" to ");
+        astart_time = aalltime[0];
+        aend_time = aalltime[1];
+        alocation = q.div.div.div.div.div.div.(@id == "event-info").div[1].p.toString();
+        ahost = q.div.div.div.div.div.div.(@id == "event-info").div[2].a.toString();
+        adescription = q.div.div.div.div.p.text().toString();
 
-
-        // http://jacketpages.gatech.edu/events/details/53498
-        /** Process a requested page **/
-            /** 
-            - February 7, 7:00 AM to 5:00 PM
-            AM
-            **/
-            // "m-d-Y h:i A"
-            // remapped to YY MM DD 't' hh II SS
-            /* Previous method to reformat time (to use as reference)
-            var regextime = /^-\s+(\w+)\s+([0-9]{2}),\s+([0-9]{2})\s+([0-9]{1,2}):([0-9]{2})\s+(A|P)/;
-            atimestamp = atimestamp
-              .match(regextime);
-            if(atimestamp != null) {
-              if(atimestamp[6] == "P" && atimestamp[4] != "12") {
-                atimestamp[4] = parseInt(atimestamp[4], 10) + 12;
-              } else if(atimestamp[6] == "A" && atimestamp[4] == "12") {
-                atimestamp[4] = "00";
-                // pad single digit
-              } else if(atimestamp[4] < 10) {
-                atimestamp[4] = "0" + atimestamp[4];
-              }
-              atimestamp = "20" + atimestamp[3] + months[atimestamp[1]] + atimestamp[2] + "T" + atimestamp[4] + atimestamp[5];
-            }
-             */
-
-            t = <event timestamp={atimestamp} id={apostid} author={aauthor} authorid={aauthorid} title={atitle} >{abody}</event>;
+        t = <event id={eventId} title={atitle} pic={apic} start_time={astart_time} end_time={aend_time} location={alocation} host={ahost} >{adescription}</event>;
         return t;
       }
 
