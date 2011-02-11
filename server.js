@@ -87,20 +87,6 @@ fbclient.getAppToken(function (res) {
 	});
 });
 
-	
-/**
- * Facebook Authentication
- */
- 
-app.get('/auth', function (req, res) {
-  fbclient.getAccessToken(
-    {redirect_uri: 'http://' + THISHOST + '/auth',
-     code: req.param('code')},
-     function (error, token) {
-		 	 initUserInfo(token.access_token);
-       res.redirect('profile/'+token.access_token);
-    });
-});
 
 
 function fetchPageEvent(callback) {
@@ -178,12 +164,19 @@ function fetchEventInfo(eids) {
  * Initialize User data
  * @param {Object} facebook user access_token
  */
-function initUserInfo(fb_user_token) {
+function initUserInfo(gtid, fb_user_token) {
 	fbclient.getMyProfile(
     fb_user_token,
   	function (err, res) {
 			//store user info
-			rclient.hmset('user:'+res.id, res);
+			res.gtid = gtid;
+			rclient.hmset('user:'+gtid, res);
+			//store gtid <=> fbid mapping
+			rclient.hmset('gtid:fb', gtid, res.id);
+			rclient.hmset('fb:gtid', res.id, gtid);
+			rclient.sadd('userslist', gtid);
+			rclient.hmset('gtid:'+gtid, {name: res.name, fbid: res.id});
+			
 			var fqls = new Array();
 			var now = parseInt((new Date().getTime())/1000);
 			var uid = res.id;
@@ -253,7 +246,19 @@ function initUserInfo(fb_user_token) {
 		});
 }
 
-
+/**
+ * Landing Page
+ * @param {Object} gtID [swang308]
+ * return login status
+ */
+app.get("/:gtid", function (req, res, next) {
+	rclient.hget('gtid:fb', req.params.gtid, function (err, fbid) {
+		res.send((fbid ?
+			{'login_status': 'true'} :
+			{'login_status': 'false'}
+		));
+	})
+});
 
 /**
  * Fetch User Facebook Info
@@ -577,16 +582,29 @@ app.get('/event/list/fricount/:uid', function(req, res, next) {
 
 /**
  * Facbook Login Page
- * TODO: check access token
  */
  
-app.get('/login', function (req, res, next) {
+app.get('/login/:gtid', function (req, res, next) {
   //request permission
   res.redirect(fbclient.getAuthorizeUrl({
     client_id: FBKEY,
-    redirect_uri: 'http://' + THISHOST + '/auth',
+    redirect_uri: 'http://' + THISHOST + '/auth/'+req.params.gtid,
     scope:      'offline_access,publish_stream,user_events,friends_events,create_event,rsvp_event'
   }));
+});
+
+/**
+ * Facebook Authentication
+ */
+app.get('/auth/:gtid', function (req, res) {
+  fbclient.getAccessToken(
+    {redirect_uri: 'http://' + THISHOST + '/auth/' + req.params.gtid,
+     code: req.param('code')},
+     function (error, token) {
+		 	 console.log(req.params.gtid);
+			 initUserInfo(req.params.gtid, token.access_token);
+       res.redirect('/profile/'+token.access_token);
+    });
 });
   
   
