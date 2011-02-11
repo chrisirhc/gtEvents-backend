@@ -11,6 +11,25 @@ var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
  */
 var NUM_LIST_EVENT = 20; //number of events shown on list page
 var NUM_LIST_ATTEND = 5; //number of attendees shown on list page
+var FB_PAGES = new Array(
+	'35150423420', //FerstCenter
+	'104374712683', //CRC
+	'104804139480', //College of Computing
+	'311147925771', //Georgia Institute of Technology Bands 
+	'15328653162', //Georgia Tech Athletics
+	'105166199515818', //Georgia Tech Office of Success Programs"
+	'135540189805805', //Georgia Tech Goldfellas
+	'107518605955318', //Georgia Tech Student Center
+	'59102723065', //Student Center Programs Council
+	'8264471191', //Georgia Tech Library
+	'363586652173', //Georgia Tech Career Services
+	'44851172785', //Georgia Tech Crew
+	'245926061925', //AIESEC Georgia Tec
+	'85852244494', //Georgia Tech Hockey
+	'184109331229', //Georgia Tech College of Management Undergraduate Program
+	'179607177694', //Georgia Tech College of Architecture
+	'190989114263815' //GtEvents  :)
+);
 /**
  * This is where it all begins
  */
@@ -63,6 +82,9 @@ fbclient = fbclient(
 /** Get Facebook Application Token (different from user access_token) **/
 fbclient.getAppToken(function (res) {
 	fbapptoken = res;
+	fetchPageEvent(function (result) {
+		fetchEventInfo(result);
+	});
 });
 
 	
@@ -81,6 +103,77 @@ app.get('/auth', function (req, res) {
 });
 
 
+function fetchPageEvent(callback) {
+	var eids = new Array();
+	var j=1;
+	for(var i=0; i<FB_PAGES.length; i++) {
+		fbclient.apiCall('GET', 
+			'/' + FB_PAGES[i] + '/events',
+			{access_token: fbapptoken},
+			function (err, res) {
+				for (var i=0; i<res.data.length; i++) {
+					if ((new Date(res.data[i].start_time)).getTime() > 
+							(new Date()).getTime()) {
+								 eids.push(res.data[i].id);
+							}
+				}
+				//wait for all request to come back
+				if(j++ == FB_PAGES.length) {
+					callback(eids);
+				}
+			});
+	}
+}
+
+function fetchEventInfo(eids) {
+	var fqls = new Array();
+	fqls['upcomingevents'] = 
+		"SELECT eid, name, pic_small, pic_big, pic, start_time, end_time, host, description, location " +
+				"FROM event WHERE eid IN (" + eids.join(',') +")";
+	fqls['attendance'] = "SELECT eid, uid FROM event_member WHERE eid IN " +
+				"(SELECT eid FROM #upcomingevents) AND rsvp_status = '" + fbclient.RSVP_ATTENDING + "'";
+	fqls['attname'] = "SELECT name, uid FROM user WHERE uid IN " +
+										"(SELECT uid FROM #attendance)";
+	fbclient.multifqlCall(
+			fqls,
+			{access_token: fbapptoken,
+			 format:'json',
+			},
+			function(err, result) {					
+				var i, eve, user;					
+				var multiadd = rclient.multi();
+
+				for (i=0; i<result[0].fql_result_set.length; i++) {
+					eve = result[0].fql_result_set[i];
+					eve.start_time = eve.start_time * 1000; 
+					eve.end_time = eve.end_time * 1000;
+					//store event
+					multiadd.hmset('event:fb:'+eve.eid, eve);
+					//add to event list
+					multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+					multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+					//fetch event feeds
+					getEventFeed(eve.eid);
+				}
+							
+				//store to attendance
+				for (i = 0; i < result[1].fql_result_set.length; i++) {
+					eve = result[1].fql_result_set[i];
+					multiadd.sadd('attendance:fb:'+eve.eid, eve.uid);
+				}							
+				
+				//store attendee name
+				for (i=0; i<result[2].fql_result_set.length; i++) {
+					user = result[2].fql_result_set[i];
+					multiadd.hmset('user:'+user.uid, user);
+				}
+
+				multiadd.exec(function (err, replies) {
+					console.log(replies);
+					console.log('done fetching georgia tech events');
+				});
+		});
+}
 /**
  * Initialize User data
  * @param {Object} facebook user access_token
