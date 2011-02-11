@@ -51,12 +51,12 @@
           '" and xpath="//div[@id=\'mainColumn\']";')
           .results;
 
-        atitle = q.div.h2.em.toString());
+        atitle = q.div.h2.em.toString();
         apic = "http://jacketpages.gatech.edu" + q.div.div.div.div.div.div.(@id == "event-image")..img.@src.toString();
         // Separate later
         aall_time = q.div.div.div.div.div.div.(@id == "event-info").div[0].p.toString().split(" to ");
-        astart_time = aalltime[0];
-        aend_time = aalltime[1];
+        astart_time = aall_time[0];
+        aend_time = aall_time[1];
         alocation = q.div.div.div.div.div.div.(@id == "event-info").div[1].p.toString();
         ahost = q.div.div.div.div.div.div.(@id == "event-info").div[2].a.toString();
         adescription = q.div.div.div.div.p.text().toString();
