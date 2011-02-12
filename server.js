@@ -155,7 +155,6 @@ function fetchEventInfo(eids) {
 				}
 
 				multiadd.exec(function (err, replies) {
-					console.log(replies);
 					console.log('done fetching georgia tech events');
 				});
 		});
@@ -515,42 +514,46 @@ app.get('/event/participated/:uid', function(req, res, next){
 });
 
 
-function getEventList(uid, sort_func, callback) {
+function getEventList(gtid, sort_func, callback) {
+	var uid;
 	var results = new Array();
-	 rclient.smembers("eventslist", function (err, events) {
-     var multiget = rclient.multi();
-		 var eve;
-		 var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
-		 for (var i=0; i<events.length; i++) {
-		 	 eve = events[i];
-		 	 multiget.hgetall(eve);
-			 multiget.smembers("attendance:" + eve.substr(6));
-			 multiget.sinter('fbfriendslist:' + uid, 
-								 			 'attendance:'  + eve.substr(6));
-		 }
-		 multiget.exec(function (err, replies) {
-		 	 for(var i=0; i<replies.length; ) {
-			 	  var event = replies[i++];
-					var attendance = replies[i++];
-					var friends = replies[i++];
-					event.total_count = attendance.length;
-					event.friend_count = friends.length;
-					event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
-					event.friends = friends.slice(0, NUM_LIST_ATTEND);
-					results.push(event);
-					//magic sort!
-				} 
-				results = results.sort(sort_func);
-   			return callback(results);
-		 })
-  });	
+	 rclient.hget('gtid:fb', gtid, function (err, res) { 
+		 uid = res; 	
+		 rclient.smembers("eventslist", function (err, events) {
+	     var multiget = rclient.multi();
+			 var eve;
+			 var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
+			 for (var i=0; i<events.length; i++) {
+			 	 eve = events[i];
+			 	 multiget.hgetall(eve);
+				 multiget.smembers("attendance:" + eve.substr(6));
+				 multiget.sinter('fbfriendslist:' + uid, 
+									 			 'attendance:'  + eve.substr(6));
+			 }
+			 multiget.exec(function (err, replies) {
+			 	 for(var i=0; i<replies.length; ) {
+				 	  var event = replies[i++];
+						var attendance = replies[i++];
+						var friends = replies[i++];
+						event.total_count = attendance.length;
+						event.friend_count = friends.length;
+						event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+						event.friends = friends.slice(0, NUM_LIST_ATTEND);
+						results.push(event);
+						//magic sort!
+					} 
+					results = results.sort(sort_func);
+	   			return callback(results);
+			 })
+	  });	
+	});
 }
 
 /**
  * Event List Sorted by Time
  */
-app.get('/event/list/time/:uid', function(req, res, next) {
-	getEventList(req.param.uid, 
+app.get('/event/list/time/:gtid', function(req, res, next) {
+	getEventList(req.params.gtid, 
 				function (a, b) {return b.start_time - a.start_time;},
 				function (result) {
 					res.send(result);
@@ -560,8 +563,8 @@ app.get('/event/list/time/:uid', function(req, res, next) {
 /**
  * Event List Sorted by Total Attendance
  */
-app.get('/event/list/totcount/:uid', function(req, res, next) {
-	getEventList(req.param.uid, 
+app.get('/event/list/totcount/:gtid', function(req, res, next) {
+	getEventList(req.params.gtid, 
 			function (a, b) {return b.total_count - a.total_count;},
 			function (result) {
 				res.send(result);
@@ -571,8 +574,8 @@ app.get('/event/list/totcount/:uid', function(req, res, next) {
 /**
  * Event List Sorted by Friend Attendance
  */
-app.get('/event/list/fricount/:uid', function(req, res, next) {
-	getEventList(req.param.uid, 
+app.get('/event/list/fricount/:gtid', function(req, res, next) {
+	getEventList(req.params.gtid, 
 			function (a, b) {return b.friend_count - a.friend_count;},
 			function (result) {
 				res.send(result);
@@ -601,7 +604,6 @@ app.get('/auth/:gtid', function (req, res) {
     {redirect_uri: 'http://' + THISHOST + '/auth/' + req.params.gtid,
      code: req.param('code')},
      function (error, token) {
-		 	 console.log(req.params.gtid);
 			 initUserInfo(req.params.gtid, token.access_token);
        res.redirect('/profile/'+token.access_token);
     });
