@@ -584,6 +584,26 @@ app.get('/event/list/fricount/:gtid', function(req, res, next) {
 
 
 /**
+ * RSVP Event
+ * params: status {attending/declined/maybe}
+ * return {response: true/false}
+ */
+app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
+	var multiget = rclient.multi();
+	rclient.hgetall('user:'+req.params.gtid, 
+	 function (err, result) {
+	 	 fbclient.rsvpEvent( 
+		 	 req.params.eid, 
+			 result.access_token, 
+		   req.params.status, 
+			 function(err, response) {
+			 	 res.send({'response' : response});
+			 })
+	});
+});
+
+
+/**
  * Facbook Login Page
  */
  
