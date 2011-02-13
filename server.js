@@ -219,7 +219,7 @@ function initUserInfo(gtid, fb_user_token) {
 						eve = result[2].fql_result_set[i];
 						eve.start_time = eve.start_time * 1000; 
 						eve.end_time = eve.end_time * 1000;
-						eve.id = "event:fb:" + eve.eid;
+						eve.id = "fb:" + eve.eid;
 						//store event
 						multiadd.hmset('event:fb:'+eve.eid, eve);
 						//add to event list
@@ -523,6 +523,7 @@ app.get('/fetchjp', function (req, res, next) {
 
         for (i = 0; eve = events[i]; i++) {
           eve.eid = eve.id;
+					eve.id = 'jp:' + eve.id;
           if (eve.end_time.indexOf(",") == -1) {
             eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
           }
