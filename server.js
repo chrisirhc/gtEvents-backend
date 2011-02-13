@@ -526,15 +526,22 @@ app.get('/fetchjp', function (req, res, next) {
           if (eve.end_time.indexOf(",") == -1) {
             eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
           }
+          // We won't really use the info in db but it's there. Probably for updates.
+
           // Insert into database
+          fbclient.createEvent('190989114263815', eve, function (err, res) {
+            console.log(res);
+            // insert the id to map over so that we won't reinsert this in fb.
+            // multi.hset('event:jp:fb', eve.eid, 'xxx');
+            console.log("Inserted: " + eve.name);
+          });
           multi.hmset('event:jp:'+eve.eid, eve);
-          multi.sadd('eventslist', 'event:jp:'+eve.eid);
           multi.sadd('eventslist:jp', 'event:jp:'+eve.eid);
         }
 
         multi.exec(function (err, replies) {
           if (!err) {
-            res.send("Fetched");
+            res.send(sys.inspect(eve));
           }
         });
       }
