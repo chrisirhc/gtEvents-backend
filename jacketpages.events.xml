@@ -67,7 +67,7 @@
         ahost = tempq.(@id == "event-info").div[2].a.toString();
         adescription = q.div.div.div.div.p.text().toString();
 
-        t = <event id={eventId} title={atitle} pic={apic} pic_big={apic_big} start_time={astart_time} end_time={aend_time} location={alocation} host={ahost} >{adescription}</event>;
+        t = <event id={eventId} name={atitle} pic={apic} pic_big={apic_big} start_time={astart_time} end_time={aend_time} location={alocation} host={ahost} >{adescription}</event>;
         return t;
       }
 
