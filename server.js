@@ -432,7 +432,7 @@ function getEventList(gtid, sort_func, callback) {
  */
 app.get('/event/list/time/:gtid', function(req, res, next) {
 	getEventList(req.params.gtid, 
-				function (a, b) {return b.start_time - a.start_time;},
+				function (a, b) {return a.start_time - b.start_time;},
 				function (result) {
 					res.send(result);
 				});
