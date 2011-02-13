@@ -405,7 +405,7 @@ function getEventList(gtid, sort_func, callback) {
 			 	 eve = events[i];
 			 	 multiget.hgetall(eve);
 				 multiget.smembers("attendance:" + eve.substr(6));
-				 multiget.sinter('fbfriendslist:' + uid, 
+				 multiget.sinter('fbfriendslist:' + gtid, 
 									 			 'attendance:'  + eve.substr(6));
 			 }
 			 multiget.exec(function (err, replies) {
