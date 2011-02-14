@@ -295,7 +295,6 @@ app.get('/event/attendance/total/:eid', function (req, res, next) {
 		function (error, attendance, body) {
 			var multiget = rclient.multi();
     	for (i = 0; i < attendance.length; i++) {
-				console.log(attendance[i]);
      		multiget.hgetall('fbuser:' + attendance[i]);
     	}
     	multiget.exec(function (err, replies) {
@@ -317,7 +316,6 @@ app.get('/event/attendance/friend/:eid/:gtid', function (req, res, next) {
 			function (error, attendance) {
 				var multiget = rclient.multi();
 	    	for (i = 0; i < attendance.length; i++) {
-					console.log(attendance[i]);
 	     		multiget.hgetall('fbuser:' + attendance[i]);
 	    	}
 	    	multiget.exec(function (err, replies) {
@@ -378,7 +376,6 @@ function getEventFeed(eid) {
 app.get('/event/detail/:eid/:gtid', function (req, res, next) {
 	var eid = unescape(req.params.eid);
 	var multiget = rclient.multi();
-	console.log(eid);
 	multiget.hgetall(eid);
   multiget.hget('usereventslist:'+req.params.gtid, eid);
 	multiget.scard('attendance:'+eid.substr(6));
@@ -396,40 +393,37 @@ app.get('/event/detail/:eid/:gtid', function (req, res, next) {
 		
 
 function getEventList(gtid, sort_func, callback) {
-	var uid;
 	var results = new Array();
-	 rclient.hget('gtid:fb', gtid, function (err, res) { 
-		 uid = res; 	
-		 rclient.smembers("eventslist", function (err, events) {
-	     var multiget = rclient.multi();
-			 var eve;
-			 var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
-			 for (var i=0; i<events.length; i++) {
-			 	 eve = events[i];
-			 	 multiget.hgetall(eve);
-				 multiget.smembers("attendance:" + eve.substr(6));
-				 multiget.sinter('fbfriendslist:' + gtid, 
-									 			 'attendance:'  + eve.substr(6));
-	   		 multiget.scard('eventfeeds:' + eve.substr(6));
-			 }
-			 multiget.exec(function (err, replies) {
-			 	 for(var i=0; i<replies.length; ) {
-				 	  var event = replies[i++];
-						var attendance = replies[i++];
-						var friends = replies[i++];
-						event.feed_count = replies[i++];
-						event.total_count = attendance.length;
-						event.friend_count = friends.length;
-						event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
-						event.friends = friends.slice(0, NUM_LIST_ATTEND);
-						results.push(event);
-						//magic sort!
-					} 
-					results = results.sort(sort_func);
-	   			return callback(results);
-			 })
-	  });	
-	});
+			
+	rclient.smembers("eventslist", function (err, events) {
+		var multiget = rclient.multi();
+		var eve;
+		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
+		for (var i=0; i<events.length; i++) {
+			eve = events[i];
+			multiget.hgetall(eve);
+			multiget.smembers("attendance:" + eve.substr(6));
+			multiget.sinter('fbfriendslist:' + gtid, 
+						 			 'attendance:'  + eve.substr(6));
+			multiget.scard('eventfeeds:' + eve.substr(6));
+		}
+		multiget.exec(function (err, replies) {
+			for(var i=0; i<replies.length; ) {
+			  var event = replies[i++];
+				var attendance = replies[i++];
+				var friends = replies[i++];
+				event.feed_count = replies[i++];
+				event.total_count = attendance.length;
+				event.friend_count = friends.length;
+				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+				event.friends = friends.slice(0, NUM_LIST_ATTEND);
+				results.push(event);	
+			}   			
+			//magic sort!
+			results = results.sort(sort_func);
+			return callback(results);
+		})
+	});	
 }
 
 /**
@@ -464,6 +458,52 @@ app.get('/event/list/fricount/:gtid', function(req, res, next) {
 				res.send(result);
 			});
 });
+
+/**
+ * Event List (Invited Only)
+ */
+app.get('/event/list/invited/:gtid', function(req, res, next) {
+	var results = new Array();
+			
+	rclient.hkeys("usereventslist:" + req.params.gtid, function (err, events) {
+		var multiget = rclient.multi();
+		var eve;
+		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
+		for (var i=0; i< size; i++) {
+			eve = events[i];
+			multiget.hgetall(eve);
+			multiget.smembers("attendance:" + eve.substr(6));
+			multiget.sinter('fbfriendslist:' + req.params.gtid, 
+						 			 'attendance:'  + eve.substr(6));
+			multiget.scard('eventfeeds:' + eve.substr(6));
+			multiget.hget('usereventslist:' + req.params.gtid, eve);
+		}
+		multiget.exec(function (err, replies) {
+			for(var i=0; i<replies.length; ) {
+			  var event = replies[i++];
+				var attendance = replies[i++];
+				var friends = replies[i++];
+				if (! event.id ) {
+					rclient.hdel("usereventslist:" + req.params.gtid, eve);
+					break; //past events
+				}
+				event.feed_count = replies[i++];
+				event.rsvp_status = replies[i++];
+				event.total_count = attendance.length;
+				event.friend_count = friends.length;
+				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
+				results.push(event);	
+			}   			
+			//magic sort!
+			results = results.sort(function (a, b) {return a.start_time - b.start_time});
+			res.send(results);
+		})
+	});	
+});
+
+
+
 
 
 /**
@@ -550,8 +590,10 @@ app.get('/fetchjp', function (req, res, next) {
 
 /** Should make this an atomic command but do it later **/
 app.get('/clear', function (req, res, next) {
-  //clean up db
-	rclient.flushdb(); //for development only
+  //clean up db, 
+	rclient.flushdb(function (err,result) {
+		res.send("Cleaned.");
+	}); //for development only
 });
 
 /**
