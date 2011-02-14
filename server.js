@@ -577,6 +577,19 @@ app.get('/fetchjp', function (req, res, next) {
           if (eve.end_time.indexOf(",") == -1) {
             eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
           }
+					eve.description = (escape(eve.description) || '');
+							
+					eve.start_time = new Date(eve.start_time);
+					eve.end_time = new Date(eve.end_time);
+					if (eve.start_time.getFullYear() < ((new Date()).getFullYear() -2)) {
+						eve.start_time.setFullYear((new Date()).getFullYear());
+						eve.end_time.setFullYear((new Date()).getFullYear());
+					}
+					
+					eve.start_time = eve.start_time.getTime();
+					eve.end_time = eve.end_time.getTime();
+				
+			
           // We won't really use the info in db but it's there. Probably for updates.
           multi.hmset('event:jp:'+eve.eid, eve);
           multi.sadd('eventslist:jp', 'event:jp:'+eve.eid);
@@ -584,18 +597,26 @@ app.get('/fetchjp', function (req, res, next) {
           /** Remove useless stuff that can't be inserted **/
           delete eve.eid;
           delete eve.id;
+					delete eve.title;
           delete eve.host;
           delete eve.pic;
           delete eve.pic_big;
-          eve.access_token = FBTOKEN;
-
+					eve.start_time = eve.start_time / 1000;
+					eve.end_time = eve.end_time / 1000;		
+					eve.page_id = '190989114263815';
+					eve.category = '1';
+					eve.subcategory = '1';
+					eve.location = 'Georgia Tech';
+					eve.city = 'Atlanta';
+					eve.privacy = 'OPEN';
+					console.log(eve);
           // Insert into database
-          fbclient.createEvent('190989114263815', eve, (function (currentId) {
+          fbclient.createEvent(FBTOKEN, eve, (function (currentId) {
             return function (err, res) {
               if (err) {
                 console.log("Error: " + sys.inspect(err));
               } else {
-                console.log("Inserted an event" + sys.inspect(res));
+                console.log("Inserted an event " + sys.inspect(res));
                 // insert the id to map over so that we won't reinsert this in fb.
                 multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res.id);
                 multi.hset('event:fb:jp', 'event:fb:' + res.id, 'event:jp:' + currentId);
