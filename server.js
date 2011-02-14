@@ -35,6 +35,7 @@ var FB_PAGES = new Array(
 /**
  * This is where it all begins
  */
+var sys = require("sys");
 var express = require("express");
 var request = require("request");
 var redis = require("redis"),
@@ -71,6 +72,7 @@ app.configure('development', function() {
   THISHOST = DEVELOPMENT_HOST;
   FBKEY = DEVELOPMENT_FBKEY;
   FBSECRET = DEVELOPMENT_FBSECRET;
+  FBTOKEN = DEVELOPMENT_TOKEN;
   app.listen(3000);
   console.log("Listening to 3000");
 });
@@ -522,26 +524,46 @@ app.get('/fetchjp', function (req, res, next) {
         multi = rclient.multi();
 
         for (i = 0; eve = events[i]; i++) {
-          eve.eid = eve.id;
+          currId = eve.eid = eve.id;
+
+          eve.description = eve.content;
+          delete eve.content;
+
           if (eve.end_time.indexOf(",") == -1) {
             eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
           }
           // We won't really use the info in db but it's there. Probably for updates.
-
-          // Insert into database
-          fbclient.createEvent('190989114263815', eve, function (err, res) {
-            console.log(res);
-            // insert the id to map over so that we won't reinsert this in fb.
-            // multi.hset('event:jp:fb', eve.eid, 'xxx');
-            console.log("Inserted: " + eve.name);
-          });
           multi.hmset('event:jp:'+eve.eid, eve);
           multi.sadd('eventslist:jp', 'event:jp:'+eve.eid);
+
+          /** Remove useless stuff that can't be inserted **/
+          delete eve.eid;
+          delete eve.id;
+          delete eve.host;
+          delete eve.pic;
+          delete eve.pic_big;
+          eve.access_token = FBTOKEN;
+
+          // Insert into database
+          fbclient.createEvent('190989114263815', eve, (function (currentId) {
+            return function (err, res) {
+              if (err) {
+                console.log("Error: " + sys.inspect(err));
+              } else {
+                console.log("Inserted an event" + sys.inspect(res));
+                // insert the id to map over so that we won't reinsert this in fb.
+                multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res.id);
+                multi.hset('event:fb:jp', 'event:fb:' + res.id, 'event:jp:' + currentId);
+              }
+            };
+          })(currId));
         }
 
         multi.exec(function (err, replies) {
           if (!err) {
-            res.send(sys.inspect(eve));
+            res.send(sys.inspect(events));
+          } else {
+            res.send(sys.inspect(err));
           }
         });
       }
