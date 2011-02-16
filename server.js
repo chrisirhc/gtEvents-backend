@@ -145,6 +145,7 @@ function fetchEventInfo(eids, callback) {
 					//add to event list
 					multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
 					multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+					multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
 					//fetch event feeds
 					getEventFeed(eve.eid);
 				}
@@ -228,8 +229,8 @@ function initUserInfo(gtid, fb_user_token, callback) {
 						eve.id = "fb:" + eve.eid;
 						//store event
 						multiadd.hmset('event:fb:'+eve.eid, eve);
-						//add to event list , do not store user event in global list
-						//multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+						//add to event to global list
+						multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
 						//multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
 						//fetch event feeds
 						getEventFeed(eve.eid);
@@ -404,10 +405,10 @@ app.get('/event/detail/:eid/:gtid', function (req, res, next) {
 });
 		
 
-function getEventList(gtid, sort_func, callback) {
+function getEventList(gtid, eventslist, sort_func, callback) {
 	var results = new Array();
 			
-	rclient.smembers("eventslist", function (err, events) {
+	rclient.smembers(eventslist, function (err, events) {
 		var multiget = rclient.multi();
 		var eve;
 		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
@@ -442,7 +443,7 @@ function getEventList(gtid, sort_func, callback) {
  * Event List Sorted by Time
  */
 app.get('/event/list/time/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'eventslist', 
 				function (a, b) {return a.start_time - b.start_time;},
 				function (result) {
 					res.send(result);
@@ -453,7 +454,7 @@ app.get('/event/list/time/:gtid', function(req, res, next) {
  * Event List Sorted by Total Attendance
  */
 app.get('/event/list/totcount/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'globaleventslist',
 			function (a, b) {return b.total_count - a.total_count;},
 			function (result) {
 				res.send(result);
@@ -464,7 +465,7 @@ app.get('/event/list/totcount/:gtid', function(req, res, next) {
  * Event List Sorted by Friend Attendance
  */
 app.get('/event/list/fricount/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'globaleventslist',
 			function (a, b) {return b.friend_count - a.friend_count;},
 			function (result) {
 				res.send(result);
@@ -476,7 +477,7 @@ app.get('/event/list/fricount/:gtid', function(req, res, next) {
  * By: 1. friends 2.time 3.total
  */
 app.get('/event/list/smart/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'globaleventslist',
 			function (a, b) { 
 				if (b.friend_count != a.friend_count) {
 					 return b.friend_count - a.friend_count;
