@@ -665,8 +665,12 @@ function fetchJP(req, res, callback) {
  */
 app.get('/refresh', (function () {
   return function (req, res) {
-    refreshStuff();
-    res.send("Database is now refreshing.");
+    if (backgroundProcess) {
+      refreshStuff();
+      res.send("Database is now refreshing.");
+    } else {
+      res.send("Database is already in the midst of refreshing.");
+    }
   };
 })());
 
@@ -674,12 +678,11 @@ var TIMERCONST = 10 * 60 * 1000;
 var backgroundProcess;
 
 function refreshStuff() {
+  backgroundProcess = null;
   Step(function () {
-    console.log("1");
     // Fetch JP Pages
     fetchJP(undefined, undefined, this);
   }, function (err) {
-    console.log("2");
     var callback = this;
     // Fetch Facebook Events
     fetchPageEvent(
@@ -688,7 +691,7 @@ function refreshStuff() {
       }
     );
   }, function (err) {
-    console.log("3");
+    sys.log("Another round of background process.");
     backgroundProcess = setTimeout(TIMERCONST, function () {
       refreshStuff();
     });
