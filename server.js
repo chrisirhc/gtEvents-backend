@@ -172,7 +172,7 @@ function fetchEventInfo(eids, callback) {
  * Initialize User data
  * @param {Object} facebook user access_token
  */
-function initUserInfo(gtid, fb_user_token) {
+function initUserInfo(gtid, fb_user_token, callback) {
 	fbclient.getMyProfile(
     fb_user_token,
   	function (err, res) {
@@ -250,6 +250,7 @@ function initUserInfo(gtid, fb_user_token) {
 					}
 
 					multiadd.exec(function (err, replies) {
+						callback();
 						console.log('done fetching');
 					});
 			});
@@ -578,8 +579,9 @@ app.get('/auth/:gtid', function (req, res) {
     {redirect_uri: 'http://' + THISHOST + '/auth/' + req.params.gtid,
      code: req.param('code')},
      function (error, token) {
-			 initUserInfo(req.params.gtid, token.access_token);
-       res.redirect('/event/list/time/'+req.params.gtid);
+			 initUserInfo(req.params.gtid, token.access_token, function () {
+			 	  res.redirect('/event/list/time/'+req.params.gtid);
+			 });
     });
 });
   
