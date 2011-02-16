@@ -23,7 +23,7 @@ var FB_PAGES = new Array(
 	'104804139480', //College of Computing
 	'311147925771', //Georgia Institute of Technology Bands 
 	'15328653162', //Georgia Tech Athletics
-	'105166199515818', //Georgia Tech Office of Success Programs"
+	'105166199515818', //Georgia Tech Office of Success Programs
 	'135540189805805', //Georgia Tech Goldfellas
 	'107518605955318', //Georgia Tech Student Center
 	'59102723065', //Student Center Programs Council
@@ -47,6 +47,7 @@ var redis = require("redis"),
   rclient = redis.createClient();
 
 var fbclient = require('./lib/facebook-js');
+var Step = require('./lib/step/lib/step.js');
 
 var app = express.createServer();
 var fbapptoken='';
@@ -92,9 +93,6 @@ fbclient = fbclient(
 /** Get Facebook Application Token (different from user access_token) **/
 fbclient.getAppToken(function (res) {
 	fbapptoken = res;
-	fetchPageEvent(function (result) {
-		fetchEventInfo(result);
-	});
 });
 
 
@@ -120,7 +118,7 @@ function fetchPageEvent(callback) {
 	}
 }
 
-function fetchEventInfo(eids) {
+function fetchEventInfo(eids, callback) {
 	var fqls = new Array();
 	fqls['upcomingevents'] = 
 		"SELECT eid, name, pic_small, pic_big, pic, start_time, end_time, host, description, location " +
@@ -166,6 +164,7 @@ function fetchEventInfo(eids) {
 
 				multiadd.exec(function (err, replies) {
 					console.log('done fetching georgia tech events');
+          callback && callback();
 				});
 		});
 }
@@ -586,6 +585,10 @@ app.get('/auth/:gtid', function (req, res) {
   
 
 app.get('/fetchjp', function (req, res, next) {
+  return fetchJP(req, res);
+});
+
+function fetchJP(req, res, callback) {
   request({
     uri: "http://query.yahooapis.com/v1/public/yql?q=use%20%22http%3A%2F%2Fchrisirhc.github.com%2FgtEvents-backend%2Fjacketpages.events.xml%22%3B%20select%20*%20from%20jacketpages.events%3B&format=json"
   },
@@ -596,6 +599,8 @@ app.get('/fetchjp', function (req, res, next) {
         events = bodyObj.query.results.events.event;
         multi = rclient.multi();
 
+        Step(function () {
+          var group = this.group();
         for (i = 0; eve = events[i]; i++) {
           currId = eve.eid = 'jp:' + eve.id;
 
@@ -636,33 +641,83 @@ app.get('/fetchjp', function (req, res, next) {
 					eve.subcategory = '1';
 					eve.city = 'Atlanta';
 					eve.privacy = 'OPEN';
-					console.log(eve);
           // Insert into database
-          fbclient.createEvent(FBTOKEN, eve, (function (currentId) {
-            return function (err, res) {
-              if (err) {
-                console.log("Error: " + sys.inspect(err));
+          rclient.hexists('event:jp:fb','event:jp:' + currId, (
+            function (eve, currentId, groupcallback) {
+            return function (err, result) {
+              // If it doesn't exist, then create it.
+              if (!result) {
+                fbclient.createEvent(FBTOKEN, eve, function (err, res) {
+                  if (err) {
+                    console.log("Error: " + sys.inspect(err));
+                  } else {
+                    console.log("Inserted an event " + sys.inspect(res));
+                    // insert the id to map over so that we won't reinsert this in fb.
+                    multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res.id);
+                    multi.hset('event:fb:jp', 'event:fb:' + res.id, 'event:jp:' + currentId);
+                  }
+                  groupcallback();
+                });
               } else {
-                console.log("Inserted an event " + sys.inspect(res));
-                // insert the id to map over so that we won't reinsert this in fb.
-                multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res.id);
-                multi.hset('event:fb:jp', 'event:fb:' + res.id, 'event:jp:' + currentId);
+                groupcallback();
               }
             };
-          })(currId));
+          })(eve, currId, group()));
         }
-
-        multi.exec(function (err, replies) {
-          if (!err) {
-            res.send(sys.inspect(events));
-          } else {
-            res.send(sys.inspect(err));
-          }
+        }, function (err) {
+          multi.exec(function (err, replies) {
+            if (!err) {
+              res && res.send(sys.inspect(events));
+            } else {
+              res && res.send("Error occurred");
+              console.log(sys.inspect(err));
+            }
+            // Callback when done.
+            callback && callback();
+          });
         });
       }
     });
-});
+}
 
+/**
+ * Manual refreshing of the data on the database
+ */
+app.get('/refresh', (function () {
+  return function (req, res) {
+    if (backgroundProcess) {
+      refreshStuff();
+      res.send("Database is now refreshing.");
+    } else {
+      res.send("Database is already in the midst of refreshing.");
+    }
+  };
+})());
+
+var TIMERCONST = 10 * 60 * 1000;
+var backgroundProcess;
+
+function refreshStuff() {
+  backgroundProcess = null;
+  Step(function () {
+    // Fetch JP Pages
+    fetchJP(undefined, undefined, this);
+  }, function (err) {
+    var callback = this;
+    // Fetch Facebook Events
+    fetchPageEvent(
+      function (result) {
+        fetchEventInfo(result, callback);
+      }
+    );
+  }, function (err) {
+    sys.log("Another round of background process.");
+    backgroundProcess = setTimeout(TIMERCONST, function () {
+      refreshStuff();
+    });
+  });
+};
+refreshStuff();
 
 /** Should make this an atomic command but do it later **/
 app.get('/clear', function (req, res, next) {
