@@ -33,8 +33,7 @@ var FB_PAGES = new Array(
 	'245926061925', //AIESEC Georgia Tec
 	'85852244494', //Georgia Tech Hockey
 	'184109331229', //Georgia Tech College of Management Undergraduate Program
-	'179607177694', //Georgia Tech College of Architecture
-	'190989114263815' //GtEvents  :)
+	'179607177694' //Georgia Tech College of Architecture
 );
 
 /**
@@ -229,9 +228,9 @@ function initUserInfo(gtid, fb_user_token, callback) {
 						eve.id = "fb:" + eve.eid;
 						//store event
 						multiadd.hmset('event:fb:'+eve.eid, eve);
-						//add to event list
-						multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
-						multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+						//add to event list , do not store user event in global list
+						//multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
+						//multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
 						//fetch event feeds
 						getEventFeed(eve.eid);
 
@@ -342,7 +341,10 @@ function getEventFeed(eid) {
 		'/' + eid + '/feed',
 		{'limit': FEED_LIMIT},
 		function (error, result) {
-
+			if (error) {
+				sys.log("Error: " + error);
+				return;
+			}
 	   	var multi = rclient.multi();
 			 for (var i = 0; i < result.data.length; i++) {
 					var date = result.data[i].updated_time;
