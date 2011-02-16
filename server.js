@@ -452,11 +452,52 @@ function getEventList(gtid, eventslist, sort_func, callback) {
 				event.friend_count = friends.length;
 				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
 				event.friends = friends.slice(0, NUM_LIST_ATTEND);
-				results.push(event);	
+				if (event.end_time > (new Date()).getTime()) {
+					results.push(event);	
+				}
 			}   			
 			//magic sort!
 			results = results.sort(sort_func);
 			return callback(results);
+		})
+	});	
+}
+
+function getUserEventList(gtid, filter_fun, sort_fun, callback) {
+	var results = new Array();
+	rclient.hkeys("usereventslist:" + gtid, function (err, events) {
+		var multiget = rclient.multi();
+		var eve;
+		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
+		for (var i=0; i< size; i++) {
+			eve = events[i];
+			multiget.hgetall(eve);
+			multiget.smembers("attendance:" + eve.substr(6));
+			multiget.sinter('fbfriendslist:' + gtid, 
+						 			 'attendance:'  + eve.substr(6));
+			multiget.scard('eventfeeds:' + eve.substr(6));
+			multiget.hget('usereventslist:' + gtid, eve);
+		}
+		multiget.exec(function (err, replies) {
+			for(var i=0; i<replies.length; ) {
+			  var event = replies[i++];
+				var attendance = replies[i++];
+				var friends = replies[i++];
+				event.feed_count = replies[i++];
+				event.rsvp_status = replies[i++];
+				event.total_count = attendance.length;
+				event.friend_count = friends.length;
+				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
+				if (!event.id) {
+					rclient.hdel("usereventslist:" + gtid, eve);
+				}else {
+					(filter_fun(event) && results.push(event));
+				}	
+			}   	
+			//magic sort!
+			results = results.sort(sort_fun);
+			callback(results);
 		})
 	});	
 }
@@ -518,47 +559,82 @@ app.get('/event/list/smart/:gtid', function(req, res, next) {
  * Event List (Invited Only)
  */
 app.get('/event/list/invited/:gtid', function(req, res, next) {
-	var results = new Array();
-			
-	rclient.hkeys("usereventslist:" + req.params.gtid, function (err, events) {
-		var multiget = rclient.multi();
-		var eve;
-		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
-		for (var i=0; i< size; i++) {
-			eve = events[i];
-			multiget.hgetall(eve);
-			multiget.smembers("attendance:" + eve.substr(6));
-			multiget.sinter('fbfriendslist:' + req.params.gtid, 
-						 			 'attendance:'  + eve.substr(6));
-			multiget.scard('eventfeeds:' + eve.substr(6));
-			multiget.hget('usereventslist:' + req.params.gtid, eve);
-		}
-		multiget.exec(function (err, replies) {
-			for(var i=0; i<replies.length; ) {
-			  var event = replies[i++];
-				var attendance = replies[i++];
-				var friends = replies[i++];
-				if (! event.id ) {
-					rclient.hdel("usereventslist:" + req.params.gtid, eve);
-					break; //past events
-				}
-				event.feed_count = replies[i++];
-				event.rsvp_status = replies[i++];
-				event.total_count = attendance.length;
-				event.friend_count = friends.length;
-				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
-				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
-				results.push(event);	
-			}   			
-			//magic sort!
-			results = results.sort(function (a, b) {return a.start_time - b.start_time});
-			res.send(results);
-		})
-	});	
+	getUserEventList(req.params.gtid, 
+	function (e) {return e.end_time > (new Date()).getTime()},
+	function (a, b) {return a.start_time - b.start_time},
+		function (result) {
+			res.send(result);
+		});
 });
 
 
+/**
+ * Event List (Attending Only)
+ */
+app.get('/event/list/attending/:gtid', function(req, res, next) {
+	getUserEventList(req.params.gtid, 
+		function (e) {
+			return e.end_time > (new Date()).getTime() 
+				&& e.rsvp_status == fbclient.RSVP_ATTENDING;
+		},
+		function (a, b) {return a.start_time - b.start_time},
+		function (result) {
+			res.send(result);
+		});
+});
 
+/**
+ * Search Event
+ */
+app.get('/event/search/:str/:gtid', function(req, res, next) {
+	var keys = req.params.str.split(' ');
+	var pattern;
+	var results = [];
+	rclient.smembers('globaleventslist', function (err, list) {
+		var multi = rclient.multi();
+		for(var i=0; i < list.length; i++) {
+			multi.hgetall(list[i]);
+		}
+		multi.exec(function (err, events) {
+			for (var i=0; i<events.length; i++) {
+				var score = 0;
+				for(var j=0; j<keys.length; j++) {
+					patt = new RegExp(keys[j], 'gi');
+					score += events[i].name.search(patt);
+					score += events[i].description.search(patt);
+					score += events[i].location.search(patt);
+				}
+				events[i].score = score;
+				if (score > 0) {
+					results.push(events[i]);
+				}
+			}
+			results.sort(function (a, b) {return (b.score > a.score);});
+			results = results.slice(0, 20);	//return top 20 events
+			//add attendance and friend count
+			multi = rclient.multi();
+			for (i=0; i<results.length; i++) {
+				multi.scard('attendance:'+ results[i].id);
+				multi.sinter('fbfriendslist:' + req.params.gtid, 
+								 		 'attendance:' + results[i].id);
+			}
+			multi.exec(function (err, replies) {
+				var j=0;
+				for (i=0; i<events.length;i++) {
+					if (replies[j + 1]) {
+		  			events[i].total_count = replies[j++];
+		  			events[i].friend_count = replies[j++].length;
+		  		}else{
+						events[i].total_count = 0;
+		  			events[i].friend_count = 0;
+					}
+				}
+				res.send(results);
+			});
+			
+		});
+	});
+});
 
 
 /**
