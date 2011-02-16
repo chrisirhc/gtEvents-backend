@@ -562,7 +562,6 @@ app.get('/event/search/:str/:gtid', function(req, res, next) {
 			for (var i=0; i<events.length; i++) {
 				var score = 0;
 				for(var j=0; j<keys.length; j++) {
-					console.log(keys[j]);
 					patt = new RegExp(keys[j], 'gi');
 					score += events[i].name.search(patt);
 					score += events[i].description.search(patt);
@@ -576,6 +575,26 @@ app.get('/event/search/:str/:gtid', function(req, res, next) {
 			results.sort(function (a, b) {return (b.score > a.score);});
 			results = results.slice(0, 20);	//return top 20 events
 			//add attendance and friend count
+			multi = rclient.multi();
+			for (i=0; i<results.length; i++) {
+				multi.scard('attendance:'+ results[i].id);
+				multi.sinter('fbfriendslist:' + req.params.gtid, 
+								 		 'attendance:' + results[i].id);
+			}
+			multi.exec(function (err, replies) {
+				var j=0;
+				for (i=0; i<events.length;i++) {
+					if (replies[j + 1]) {
+		  			events[i].total_count = replies[j++];
+		  			events[i].friend_count = replies[j++].length;
+		  		}else{
+						events[i].total_count = 0;
+		  			events[i].friend_count = 0;
+					}
+				}
+				res.send(results);
+			});
+			
 		});
 	});
 });
