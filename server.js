@@ -33,8 +33,7 @@ var FB_PAGES = new Array(
 	'245926061925', //AIESEC Georgia Tec
 	'85852244494', //Georgia Tech Hockey
 	'184109331229', //Georgia Tech College of Management Undergraduate Program
-	'179607177694', //Georgia Tech College of Architecture
-	'190989114263815' //GtEvents  :)
+	'179607177694' //Georgia Tech College of Architecture
 );
 
 /**
@@ -159,6 +158,7 @@ function fetchEventInfo(eids, callback) {
 					//add to event list
 					multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
 					multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+					multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
 					//fetch event feeds
 					getEventFeed(eve.eid);
 				}
@@ -187,7 +187,7 @@ function fetchEventInfo(eids, callback) {
  * Initialize User data
  * @param {Object} facebook user access_token
  */
-function initUserInfo(gtid, fb_user_token) {
+function initUserInfo(gtid, fb_user_token, callback) {
 	fbclient.getMyProfile(
     fb_user_token,
   	function (err, res) {
@@ -244,9 +244,9 @@ function initUserInfo(gtid, fb_user_token) {
 						eve.id = "fb:" + eve.eid;
 						//store event
 						multiadd.hmset('event:fb:'+eve.eid, eve);
-						//add to event list
-						multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
-						multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+						//add to event to global list
+						multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
+						//multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
 						//fetch event feeds
 						getEventFeed(eve.eid);
 
@@ -265,6 +265,7 @@ function initUserInfo(gtid, fb_user_token) {
 					}
 
 					multiadd.exec(function (err, replies) {
+						callback();
 						console.log('done fetching');
 					});
 			});
@@ -356,7 +357,10 @@ function getEventFeed(eid) {
 		'/' + eid + '/feed',
 		{'limit': FEED_LIMIT},
 		function (error, result) {
-
+			if (error) {
+				sys.log("Error: " + error);
+				return;
+			}
 	   	var multi = rclient.multi();
 			 for (var i = 0; i < result.data.length; i++) {
 					var date = result.data[i].updated_time;
@@ -416,10 +420,10 @@ app.get('/event/detail/:eid/:gtid', function (req, res, next) {
 });
 		
 
-function getEventList(gtid, sort_func, callback) {
+function getEventList(gtid, eventslist, sort_func, callback) {
 	var results = new Array();
 			
-	rclient.smembers("eventslist", function (err, events) {
+	rclient.smembers(eventslist, function (err, events) {
 		var multiget = rclient.multi();
 		var eve;
 		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
@@ -454,7 +458,7 @@ function getEventList(gtid, sort_func, callback) {
  * Event List Sorted by Time
  */
 app.get('/event/list/time/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'eventslist', 
 				function (a, b) {return a.start_time - b.start_time;},
 				function (result) {
 					res.send(result);
@@ -465,7 +469,7 @@ app.get('/event/list/time/:gtid', function(req, res, next) {
  * Event List Sorted by Total Attendance
  */
 app.get('/event/list/totcount/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'globaleventslist',
 			function (a, b) {return b.total_count - a.total_count;},
 			function (result) {
 				res.send(result);
@@ -476,8 +480,28 @@ app.get('/event/list/totcount/:gtid', function(req, res, next) {
  * Event List Sorted by Friend Attendance
  */
 app.get('/event/list/fricount/:gtid', function(req, res, next) {
-	getEventList(req.params.gtid, 
+	getEventList(req.params.gtid, 'globaleventslist',
 			function (a, b) {return b.friend_count - a.friend_count;},
+			function (result) {
+				res.send(result);
+			});
+});
+
+/**
+ * Event List Smarted Sorted for each user
+ * By: 1. friends 2.time 3.total
+ */
+app.get('/event/list/smart/:gtid', function(req, res, next) {
+	getEventList(req.params.gtid, 'globaleventslist',
+			function (a, b) { 
+				if (b.friend_count != a.friend_count) {
+					 return b.friend_count - a.friend_count;
+				}else if (b.start_time != a.start_time) {
+					 return a.start_time - b.start_time;
+				}else {
+					return b.total_count - a.total_count;
+				}
+			},
 			function (result) {
 				res.send(result);
 			});
@@ -537,7 +561,6 @@ app.get('/event/list/invited/:gtid', function(req, res, next) {
  * return {response: true/false}
  */
 app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
-	rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
 	//update facebook
 	rclient.hgetall('user:'+req.params.gtid, 
 	 function (err, result) {
@@ -546,7 +569,12 @@ app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
 			 result.access_token, 
 		   req.params.status, 
 			 function(err, response) {
-			 	 res.send({'response' : response});
+			 	 if(response && response == true) {
+						rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
+				 		res.send({'response' : response});
+				 }else{
+				 		res.send({'response' : 'false'});
+				 }
 			 })
 	});
 });
@@ -573,8 +601,9 @@ app.get('/auth/:gtid', function (req, res) {
     {redirect_uri: 'http://' + THISHOST + '/auth/' + req.params.gtid,
      code: req.param('code')},
      function (error, token) {
-			 initUserInfo(req.params.gtid, token.access_token);
-       res.redirect('/event/list/time/'+req.params.gtid);
+			 initUserInfo(req.params.gtid, token.access_token, function () {
+			 	  res.redirect('/event/list/time/'+req.params.gtid);
+			 });
     });
 });
   
