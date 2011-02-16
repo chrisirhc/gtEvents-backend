@@ -632,14 +632,14 @@ app.get('/event/search/:str/:gtid', function(req, res, next) {
  */
 app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
 	//update facebook
-	rclient.hgetall('user:'+req.params.gtid, 
+	rclient.hget('user:'+req.params.gtid, 'access_token',
 	 function (err, result) {
 	 	 fbclient.rsvpEvent( 
 		 	 req.params.eid.substr(9), 
-			 result.access_token, 
+			 result, 
 		   req.params.status, 
 			 function(err, response) {
-			 	 if(response && response == true) {
+			 	 if(response) {
 						rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
 				 		res.send({'response' : response});
 				 }else{
