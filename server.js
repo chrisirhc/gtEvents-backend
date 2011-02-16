@@ -439,11 +439,52 @@ function getEventList(gtid, eventslist, sort_func, callback) {
 				event.friend_count = friends.length;
 				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
 				event.friends = friends.slice(0, NUM_LIST_ATTEND);
-				results.push(event);	
+				if (event.end_time > (new Date()).getTime()) {
+					results.push(event);	
+				}
 			}   			
 			//magic sort!
 			results = results.sort(sort_func);
 			return callback(results);
+		})
+	});	
+}
+
+function getUserEventList(gtid, filter_fun, sort_fun, callback) {
+	var results = new Array();
+	rclient.hkeys("usereventslist:" + gtid, function (err, events) {
+		var multiget = rclient.multi();
+		var eve;
+		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
+		for (var i=0; i< size; i++) {
+			eve = events[i];
+			multiget.hgetall(eve);
+			multiget.smembers("attendance:" + eve.substr(6));
+			multiget.sinter('fbfriendslist:' + gtid, 
+						 			 'attendance:'  + eve.substr(6));
+			multiget.scard('eventfeeds:' + eve.substr(6));
+			multiget.hget('usereventslist:' + gtid, eve);
+		}
+		multiget.exec(function (err, replies) {
+			for(var i=0; i<replies.length; ) {
+			  var event = replies[i++];
+				var attendance = replies[i++];
+				var friends = replies[i++];
+				event.feed_count = replies[i++];
+				event.rsvp_status = replies[i++];
+				event.total_count = attendance.length;
+				event.friend_count = friends.length;
+				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
+				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
+				if (!event.id) {
+					rclient.hdel("usereventslist:" + gtid, eve);
+				}else {
+					(filter_fun(event) && results.push(event));
+				}	
+			}   	
+			//magic sort!
+			results = results.sort(sort_fun);
+			callback(results);
 		})
 	});	
 }
@@ -505,46 +546,29 @@ app.get('/event/list/smart/:gtid', function(req, res, next) {
  * Event List (Invited Only)
  */
 app.get('/event/list/invited/:gtid', function(req, res, next) {
-	var results = new Array();
-			
-	rclient.hkeys("usereventslist:" + req.params.gtid, function (err, events) {
-		var multiget = rclient.multi();
-		var eve;
-		var size  = (events.length > NUM_LIST_EVENT ? events.length : NUM_LIST_EVENT);
-		for (var i=0; i< size; i++) {
-			eve = events[i];
-			multiget.hgetall(eve);
-			multiget.smembers("attendance:" + eve.substr(6));
-			multiget.sinter('fbfriendslist:' + req.params.gtid, 
-						 			 'attendance:'  + eve.substr(6));
-			multiget.scard('eventfeeds:' + eve.substr(6));
-			multiget.hget('usereventslist:' + req.params.gtid, eve);
-		}
-		multiget.exec(function (err, replies) {
-			for(var i=0; i<replies.length; ) {
-			  var event = replies[i++];
-				var attendance = replies[i++];
-				var friends = replies[i++];
-				event.feed_count = replies[i++];
-				event.rsvp_status = replies[i++];
-				event.total_count = attendance.length;
-				event.friend_count = friends.length;
-				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
-				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
-				if (! event.id ) {
-					rclient.hdel("usereventslist:" + req.params.gtid, eve);
-				}else {
-					results.push(event);
-				}	
-			}   	
-			//magic sort!
-			results = results.sort(function (a, b) {return a.start_time - b.start_time});
-			res.send(results);
-		})
-	});	
+	getUserEventList(req.params.gtid, 
+	function (e) {return e.end_time > (new Date()).getTime()},
+	function (a, b) {return a.start_time - b.start_time},
+		function (result) {
+			res.send(result);
+		});
 });
 
 
+/**
+ * Event List (Attending Only)
+ */
+app.get('/event/list/attending/:gtid', function(req, res, next) {
+	getUserEventList(req.params.gtid, 
+		function (e) {
+			return e.end_time > (new Date()).getTime() 
+				&& e.rsvp_status == fbclient.RSVP_ATTENDING;
+		},
+		function (a, b) {return a.start_time - b.start_time},
+		function (result) {
+			res.send(result);
+		});
+});
 
 /**
  * Search Event
