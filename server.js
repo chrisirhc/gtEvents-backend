@@ -692,9 +692,9 @@ function refreshStuff() {
     );
   }, function (err) {
     sys.log("Another round of background process.");
-    backgroundProcess = setTimeout(TIMERCONST, function () {
+    backgroundProcess = setTimeout(function () {
       refreshStuff();
-    });
+    }, TIMERCONST);
   });
 };
 refreshStuff();
