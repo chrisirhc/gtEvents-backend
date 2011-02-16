@@ -545,7 +545,6 @@ app.get('/event/list/invited/:gtid', function(req, res, next) {
  * return {response: true/false}
  */
 app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
-	rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
 	//update facebook
 	rclient.hgetall('user:'+req.params.gtid, 
 	 function (err, result) {
@@ -554,7 +553,12 @@ app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
 			 result.access_token, 
 		   req.params.status, 
 			 function(err, response) {
-			 	 res.send({'response' : response});
+			 	 if(response && response == true) {
+						rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
+				 		res.send({'response' : response});
+				 }else{
+				 		res.send({'response' : 'false'});
+				 }
 			 })
 	});
 });
