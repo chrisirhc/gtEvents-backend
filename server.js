@@ -36,7 +36,6 @@ var FB_PAGES = new Array(
 	'179607177694', //Georgia Tech College of Architecture
 	'190989114263815' //GtEvents  :)
 );
-var GTEVENTS_PAGE = '190989114263815';
 
 /**
  * This is where it all begins
