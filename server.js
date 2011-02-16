@@ -45,6 +45,7 @@ var redis = require("redis"),
   rclient = redis.createClient();
 
 var fbclient = require('./lib/facebook-js');
+var Step = require('./lib/step/lib/step.js');
 
 var app = express.createServer();
 var fbapptoken='';
