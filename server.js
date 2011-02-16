@@ -3,8 +3,12 @@ var THISHOST = "chrisirhc.no.de";
 var DEVELOPMENT_HOST = "gtevents.localhost:3000";
 var FBKEY = 'xxxxxxxxxxxxxxx';
 var FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var FBTOKEN = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var GTEVENTS_PAGEID = 'xxxxxxxxxxxxxxxx';
 var DEVELOPMENT_FBKEY = 'xxxxxxxxxxxxxxx';
 var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var DEVELOPMENT_TOKEN = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var DEVELOPMENT_PAGEID = 'xxxxxxxxxxxxxxxx';
 
 /**
  * Constants
@@ -12,6 +16,7 @@ var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 var NUM_LIST_EVENT = 20; //number of events shown on list page
 var NUM_LIST_ATTEND = 5; //number of attendees shown on list page
 var FEED_LIMIT = 99; //number of event feeds
+var ATTENDANCE_LIMIT = 99; //number of attendance 
 var FB_PAGES = new Array(
 	'35150423420', //FerstCenter
 	'104374712683', //CRC
@@ -73,6 +78,7 @@ app.configure('development', function() {
   FBKEY = DEVELOPMENT_FBKEY;
   FBSECRET = DEVELOPMENT_FBSECRET;
   FBTOKEN = DEVELOPMENT_TOKEN;
+	GTEVENTS_PAGEID = DEVELOPMENT_PAGEID;
   app.listen(3000);
   console.log("Listening to 3000");
 });
@@ -275,7 +281,7 @@ app.get('/event/feed/:eid', function (req, res, next) {
 	rclient.smembers("eventfeeds:" + eid, 
 		function (error, eventfeeds, body) {
 			var multiget = rclient.multi();
-			var len = (FEED_LIMIT > eventfeeds.len ? eventfeeds.len : FEED_LIMIT);
+			var len = (FEED_LIMIT > eventfeeds.length ? eventfeeds.length : FEED_LIMIT);
     	for (i = 0; i < len; i++) {
      		multiget.hgetall('feed:fb:'+eventfeeds[i]);
     	}
@@ -296,7 +302,8 @@ app.get('/event/attendance/total/:eid', function (req, res, next) {
 	rclient.smembers("attendance:" + eid, 
 		function (error, attendance, body) {
 			var multiget = rclient.multi();
-    	for (i = 0; i < attendance.length; i++) {
+			var len = (ATTENDANCE_LIMIT > attendance.length ? attendance.length : ATTENDANCE_LIMIT);
+    	for (i = 0; i < len; i++) {
      		multiget.hgetall('fbuser:' + attendance[i]);
     	}
     	multiget.exec(function (err, replies) {
@@ -317,7 +324,8 @@ app.get('/event/attendance/friend/:eid/:gtid', function (req, res, next) {
 	rclient.sinter("attendance:" + eid, "fbfriendslist:" + req.params.gtid,
 			function (error, attendance) {
 				var multiget = rclient.multi();
-	    	for (i = 0; i < attendance.length; i++) {
+				var len = (ATTENDANCE_LIMIT > attendance.length ? attendance.length : ATTENDANCE_LIMIT);
+	    	for (i = 0; i < len; i++) {
 	     		multiget.hgetall('fbuser:' + attendance[i]);
 	    	}
 	    	multiget.exec(function (err, replies) {
@@ -336,7 +344,7 @@ function getEventFeed(eid) {
 		function (error, result) {
 
 	   	var multi = rclient.multi();
-			 for (i = result.data.length; i--;) {
+			 for (var i = 0; i < result.data.length; i++) {
 					var date = result.data[i].updated_time;
 					var year = date.substr(0, 4);
 					var mth = date.substr(5, 2);
@@ -577,7 +585,7 @@ app.get('/fetchjp', function (req, res, next) {
           if (eve.end_time.indexOf(",") == -1) {
             eve.end_time = eve.start_time.split(/, [1-9]/)[0] + ", " + eve.end_time;
           }
-					eve.description = (escape(eve.description) || '');
+					eve.description = (eve.description || '').replace(/\n/gi, ' ');
 							
 					eve.start_time = new Date(eve.start_time);
 					eve.end_time = new Date(eve.end_time);
@@ -603,10 +611,9 @@ app.get('/fetchjp', function (req, res, next) {
           delete eve.pic_big;
 					eve.start_time = eve.start_time / 1000;
 					eve.end_time = eve.end_time / 1000;		
-					eve.page_id = '190989114263815';
+					eve.page_id = GTEVENTS_PAGEID;
 					eve.category = '1';
 					eve.subcategory = '1';
-					eve.location = 'Georgia Tech';
 					eve.city = 'Atlanta';
 					eve.privacy = 'OPEN';
 					console.log(eve);
