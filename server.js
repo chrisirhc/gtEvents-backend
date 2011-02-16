@@ -525,18 +525,18 @@ app.get('/event/list/invited/:gtid', function(req, res, next) {
 			  var event = replies[i++];
 				var attendance = replies[i++];
 				var friends = replies[i++];
-				if (! event.id ) {
-					rclient.hdel("usereventslist:" + req.params.gtid, eve);
-					break; //past events
-				}
 				event.feed_count = replies[i++];
 				event.rsvp_status = replies[i++];
 				event.total_count = attendance.length;
 				event.friend_count = friends.length;
 				event.attendance = attendance.slice(0, NUM_LIST_ATTEND);
 				event.friends = friends.slice(0, NUM_LIST_ATTEND);	
-				results.push(event);	
-			}   			
+				if (! event.id ) {
+					rclient.hdel("usereventslist:" + req.params.gtid, eve);
+				}else {
+					results.push(event);
+				}	
+			}   	
 			//magic sort!
 			results = results.sort(function (a, b) {return a.start_time - b.start_time});
 			res.send(results);
@@ -546,6 +546,39 @@ app.get('/event/list/invited/:gtid', function(req, res, next) {
 
 
 
+/**
+ * Search Event
+ */
+app.get('/event/search/:str/:gtid', function(req, res, next) {
+	var keys = req.params.str.split(' ');
+	var pattern;
+	var results = [];
+	rclient.smembers('globaleventslist', function (err, list) {
+		var multi = rclient.multi();
+		for(var i=0; i < list.length; i++) {
+			multi.hgetall(list[i]);
+		}
+		multi.exec(function (err, events) {
+			for (var i=0; i<events.length; i++) {
+				var score = 0;
+				for(var j=0; j<keys.length; j++) {
+					console.log(keys[j]);
+					patt = new RegExp(keys[j], 'gi');
+					score += events[i].name.search(patt);
+					score += events[i].description.search(patt);
+					score += events[i].location.search(patt);
+				}
+				events[i].score = score;
+				if (score > 0) {
+					results.push(events[i]);
+				}
+			}
+			results.sort(function (a, b) {return (b.score > a.score);});
+			results = results.slice(0, 20);	//return top 20 events
+			//add attendance and friend count
+		});
+	});
+});
 
 
 /**
