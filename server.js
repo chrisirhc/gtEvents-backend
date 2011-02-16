@@ -644,6 +644,12 @@ app.get('/event/search/:str/:gtid', function(req, res, next) {
  * return {response: true/false}
  */
 app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
+	//write to storage
+	rclient.hset('usereventslist:'+req.params.gtid, 
+		req.params.eid, 
+		req.params.status, function (err, result) {
+		res.send({'response' : (result ? false : true)});
+	});
 	//update facebook
 	rclient.hget('user:'+req.params.gtid, 'access_token',
 	 function (err, result) {
@@ -653,11 +659,12 @@ app.get('/event/rsvp/:status/:eid/:gtid', function(req, res, next) {
 		   req.params.status, 
 			 function(err, response) {
 			 	 if(response) {
-						rclient.hset('usereventslist:'+req.params.gtid, req.params.eid, req.params.status);
-				 		res.send({'response' : response});
+				 	 console.log(response);//slilent
 				 }else{
-				 		res.send({'response' : 'false'});
+				 	  //TODO store in a queue, and clean up in background
+				 		rclient.hset('rsvptoupdate', req.params.gtid+':'+ req.params.eid.substr(9), req.params.status);
 				 }
+				 
 			 })
 	});
 });
