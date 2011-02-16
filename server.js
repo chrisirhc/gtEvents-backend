@@ -136,13 +136,26 @@ function fetchEventInfo(eids, callback) {
 				var i, eve, user;					
 				var multiadd = rclient.multi();
 
+        Step(function() {
+          var group = this.group();
 				for (i=0; i<result[0].fql_result_set.length; i++) {
 					eve = result[0].fql_result_set[i];
 					eve.start_time = eve.start_time * 1000; 
 					eve.end_time = eve.end_time * 1000;
 					eve.id = "fb:" + eve.eid;
-					//store event
-					multiadd.hmset('event:fb:'+eve.eid, eve);
+
+          rclient.hexists('event:fb:jp', 'event:fb:'+eve.eid, (function (eve, multi, groupcb) {
+            return function (err, res) {
+              if (!res) {
+                //store event
+                multi.hmset('event:fb:'+eve.eid, eve);
+              } else {
+                console.log(eve.eid + " was found");
+              }
+              groupcb();
+            }
+          })(eve, multiadd, group()));
+
 					//add to event list
 					multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
 					multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
@@ -161,11 +174,13 @@ function fetchEventInfo(eids, callback) {
 					user = result[2].fql_result_set[i];
 					multiadd.hmset('fbuser:'+user.uid, user);
 				}
+        }, function (err) {
 
 				multiadd.exec(function (err, replies) {
 					console.log('done fetching georgia tech events');
           callback && callback();
 				});
+        });
 		});
 }
 /**
@@ -582,7 +597,7 @@ function fetchJP(req, res, callback) {
         Step(function () {
           var group = this.group();
         for (i = 0; eve = events[i]; i++) {
-          currId = eve.eid = 'jp:' + eve.id;
+          currId = eve.id = 'jp:' + eve.id;
 
           eve.description = eve.content;
           delete eve.content;
@@ -607,38 +622,46 @@ function fetchJP(req, res, callback) {
           multi.hmset('event:jp:'+eve.eid, eve);
           multi.sadd('eventslist:jp', 'event:jp:'+eve.eid);
 
-          /** Remove useless stuff that can't be inserted **/
-          delete eve.eid;
-          delete eve.id;
-					delete eve.title;
-          delete eve.host;
-          delete eve.pic;
-          delete eve.pic_big;
-					eve.start_time = eve.start_time / 1000;
-					eve.end_time = eve.end_time / 1000;		
-					eve.page_id = GTEVENTS_PAGEID;
-					eve.category = '1';
-					eve.subcategory = '1';
-					eve.city = 'Atlanta';
-					eve.privacy = 'OPEN';
           // Insert into database
-          rclient.hexists('event:jp:fb','event:jp:' + currId, (
+          rclient.hget('event:jp:fb','event:jp:' + currId, (
             function (eve, currentId, groupcallback) {
-            return function (err, result) {
+            return function (err, fbId) {
+              var fbeve = {};
               // If it doesn't exist, then create it.
-              if (!result) {
-                fbclient.createEvent(FBTOKEN, eve, function (err, res) {
+              if (!fbId) {
+
+                // Create the Facebook event.
+                fbeve.host = eve.host;
+                fbeve.name = eve.name;
+                fbeve.description = eve.description;
+                fbeve.location = eve.location;
+                fbeve.start_time = eve.start_time / 1000;
+                fbeve.end_time = eve.end_time / 1000;
+                fbeve.page_id = GTEVENTS_PAGEID;
+                fbeve.category = '1';
+                fbeve.subcategory = '1';
+                fbeve.city = 'Atlanta';
+                fbeve.privacy = 'OPEN';
+
+                fbclient.createEvent(FBTOKEN, fbeve, function (err, res) {
                   if (err) {
                     console.log("Error: " + sys.inspect(err));
                   } else {
                     console.log("Inserted an event " + sys.inspect(res));
                     // insert the id to map over so that we won't reinsert this in fb.
-                    multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res.id);
-                    multi.hset('event:fb:jp', 'event:fb:' + res.id, 'event:jp:' + currentId);
+                    multi.hset('event:jp:fb', 'event:jp:' + currentId, 'event:fb:' + res);
+                    multi.hset('event:fb:jp', 'event:fb:' + res, 'event:jp:' + currentId);
+                    // Use the original event in JacketPages
+                    eve.eid = res;
+                    multi.hmset('event:fb:' + res, eve);
                   }
                   groupcallback();
                 });
               } else {
+                // Update/overwrite if it already exists
+                console.log("Updated an event : " + fbId);
+                eve.eid = fbId.substr(9);
+                multi.hmset(fbId, eve);
                 groupcallback();
               }
             };
