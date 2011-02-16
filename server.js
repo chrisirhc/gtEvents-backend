@@ -470,6 +470,26 @@ app.get('/event/list/fricount/:gtid', function(req, res, next) {
 });
 
 /**
+ * Event List Smarted Sorted for each user
+ * By: 1. friends 2.time 3.total
+ */
+app.get('/event/list/smart/:gtid', function(req, res, next) {
+	getEventList(req.params.gtid, 
+			function (a, b) { 
+				if (b.friend_count != a.friend_count) {
+					 return b.friend_count - a.friend_count;
+				}else if (b.start_time != a.start_time) {
+					 return a.start_time - b.start_time;
+				}else {
+					return b.total_count - a.total_count;
+				}
+			},
+			function (result) {
+				res.send(result);
+			});
+});
+
+/**
  * Event List (Invited Only)
  */
 app.get('/event/list/invited/:gtid', function(req, res, next) {
