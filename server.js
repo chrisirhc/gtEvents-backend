@@ -148,8 +148,6 @@ function fetchEventInfo(eids, callback) {
               if (!res) {
                 //store event
                 multi.hmset('event:fb:'+eve.eid, eve);
-              } else {
-                console.log(eve.eid + " was found");
               }
               groupcb();
             }
@@ -157,8 +155,8 @@ function fetchEventInfo(eids, callback) {
 
 					//add to event list
 					multiadd.sadd('eventslist', 'event:fb:'+eve.eid);
-					multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
 					multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
+					multiadd.sadd('updatedeventslist', 'event:fb:'+eve.eid);
 					//fetch event feeds
 					getEventFeed(eve.eid);
 				}
@@ -198,7 +196,7 @@ function initUserInfo(gtid, fb_user_token, callback) {
 			//store gtid <=> fbid mapping
 			rclient.hmset('gtid:fb', gtid, res.id);
 			rclient.hmset('fb:gtid', res.id, gtid);
-			rclient.sadd('userslist', gtid);
+			rclient.hset('userslist', gtid, fb_user_token);
 			rclient.hmset('gtid:'+gtid, {name: res.name, fbid: res.id});
 			
 			var fqls = new Array();
@@ -246,7 +244,7 @@ function initUserInfo(gtid, fb_user_token, callback) {
 						multiadd.hmset('event:fb:'+eve.eid, eve);
 						//add to event to global list
 						multiadd.sadd('globaleventslist', 'event:fb:'+eve.eid);
-						//multiadd.sadd('eventslist:fb', 'event:fb:'+eve.eid);
+						multiadd.sadd('updatedeventslist', 'event:fb:'+eve.eid);
 						//fetch event feeds
 						getEventFeed(eve.eid);
 
@@ -358,7 +356,7 @@ function getEventFeed(eid) {
 		{'limit': FEED_LIMIT},
 		function (error, result) {
 			if (error) {
-				sys.log("Error: " + error);
+				sys.log("Error: " + sys.inspect(error));
 				return;
 			}
 	   	var multi = rclient.multi();
@@ -735,13 +733,51 @@ function refreshStuff() {
     // Fetch JP Pages
     fetchJP(undefined, undefined, this);
   }, function (err) {
-    var callback = this;
     // Fetch Facebook Events
+    var callback = this;
     fetchPageEvent(
       function (result) {
         fetchEventInfo(result, callback);
       }
     );
+  }, function (err) {
+    // Process all users
+    rclient.hgetall('userslist', (function (groupcallback) {
+      return function (error, results) {
+        var userToken, emptyResults = true;
+        for (var userId in results) {
+          emptyResults = false;
+          userToken = results[userId];
+          console.log("processing user " + userId + " " + userToken);
+          initUserInfo(userId, userToken, groupcallback());
+        }
+        if (emptyResults) {
+          groupcallback()();
+        }
+      }
+    })(this.group()));
+  }, function (err) {
+    // Garbage collection
+    var multi = rclient.multi();
+    var callback = this;
+
+    // Find what's not touched during this update
+    multi.sdiffstore("garbageeventslist", "globaleventslist", "updatedeventslist");
+    multi.rename("updatedeventslist", "globaleventslist");
+
+    multi.exec(function (error, results) {
+      console.log("Results: " + sys.inspect(results));
+      // If there is more than one event to trash
+      if(results[0]) {
+        rclient.smembers("garbageeventslist", function (error, results) {
+          console.log("Garbage: " + sys.inspect(results));
+          rclient.del(results, callback);
+        });
+      } else {
+        console.log("No garbage.");
+        callback();
+      }
+    });
   }, function (err) {
     sys.log("Another round of background process.");
     backgroundProcess = setTimeout(function () {
