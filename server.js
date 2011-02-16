@@ -369,9 +369,18 @@ function getEventFeed(eid) {
 					var min = date.substr(14, 2);
 					var sec = date.substr(17, 2);
 				  result.data[i].update_time = new Date(year, mth, day, hour, min, sec).getTime();
-					result.data[i].name = result.data[i].from.name;
+	
+					//http://graph.facebook.com/166803010034186_166992426681911
+					//this feed don't give poster name
+					//sad, heart broken. :(
+					if(!result.data[i].from) {
+						result.data[i].name = '--';
+						result.data[i].actor_id = GTEVENTS_PAGEID; //user id
+					}else {
+						result.data[i].name = result.data[i].from.name;
+						result.data[i].actor_id = result.data[i].from.id;
+					}
 					result.data[i].message = result.data[i].message + " " + (result.data[i].description || "");
-					result.data[i].actor_id = result.data[i].from.id; //user id
 					delete result.data[i].picture;
 					delete result.data[i].from;
 					delete result.data[i].to;
