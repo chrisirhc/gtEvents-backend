@@ -3,8 +3,10 @@ var THISHOST = "chrisirhc.no.de";
 var DEVELOPMENT_HOST = "gtevents.localhost:3000";
 var FBKEY = 'xxxxxxxxxxxxxxx';
 var FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var FBTOKEN = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 var DEVELOPMENT_FBKEY = 'xxxxxxxxxxxxxxx';
 var DEVELOPMENT_FBSECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+var DEVELOPMENT_TOKEN = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
 /**
  * Constants
@@ -18,7 +20,7 @@ var FB_PAGES = new Array(
 	'104804139480', //College of Computing
 	'311147925771', //Georgia Institute of Technology Bands 
 	'15328653162', //Georgia Tech Athletics
-	'105166199515818', //Georgia Tech Office of Success Programs"
+	'105166199515818', //Georgia Tech Office of Success Programs
 	'135540189805805', //Georgia Tech Goldfellas
 	'107518605955318', //Georgia Tech Student Center
 	'59102723065', //Student Center Programs Council
@@ -31,6 +33,7 @@ var FB_PAGES = new Array(
 	'179607177694', //Georgia Tech College of Architecture
 	'190989114263815' //GtEvents  :)
 );
+var GTEVENTS_PAGE = '190989114263815';
 
 /**
  * This is where it all begins
@@ -86,9 +89,6 @@ fbclient = fbclient(
 /** Get Facebook Application Token (different from user access_token) **/
 fbclient.getAppToken(function (res) {
 	fbapptoken = res;
-	fetchPageEvent(function (result) {
-		fetchEventInfo(result);
-	});
 });
 
 
@@ -558,6 +558,10 @@ app.get('/auth/:gtid', function (req, res) {
   
 
 app.get('/fetchjp', function (req, res, next) {
+  return fetchJP(req, res);
+});
+
+function fetchJP(req, res) {
   request({
     uri: "http://query.yahooapis.com/v1/public/yql?q=use%20%22http%3A%2F%2Fchrisirhc.github.com%2FgtEvents-backend%2Fjacketpages.events.xml%22%3B%20select%20*%20from%20jacketpages.events%3B&format=json"
   },
@@ -611,6 +615,7 @@ app.get('/fetchjp', function (req, res, next) {
 					eve.privacy = 'OPEN';
 					console.log(eve);
           // Insert into database
+          // TODO modify events that have already been inserted
           fbclient.createEvent(FBTOKEN, eve, (function (currentId) {
             return function (err, res) {
               if (err) {
@@ -627,15 +632,37 @@ app.get('/fetchjp', function (req, res, next) {
 
         multi.exec(function (err, replies) {
           if (!err) {
-            res.send(sys.inspect(events));
+            res && res.send(sys.inspect(events));
           } else {
-            res.send(sys.inspect(err));
+            res && res.send("Error occurred");
+            console.log(sys.inspect(err));
           }
         });
       }
     });
-});
+}
 
+/**
+ * Manual refreshing of the data on the database
+ */
+app.get('/refresh', (function () {
+  return function (req, res) {
+    refreshStuff();
+    res.send("Database is now refreshing.");
+  };
+})());
+
+/**
+ * Manual refreshing of the data on the database
+ */
+function refreshStuff() {
+  // Fetch Facebook Events
+	fetchPageEvent(function (result) {
+		fetchEventInfo(result);
+	});
+  // Fetch JP Pages
+  fetchJP();
+}
 
 /** Should make this an atomic command but do it later **/
 app.get('/clear', function (req, res, next) {
